@@ -1,0 +1,26 @@
+name: mica_app
+description: "Set up the network of a Mica OS device over Bluetooth."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_blue_plus: ^2.3.14
+  flutter_secure_storage: ^11.2.0
+  intl: any
+  pointycastle: ^4.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
