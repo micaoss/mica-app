@@ -103,9 +103,7 @@ extension on WidgetTester {
 }
 
 void main() {
-  testWidgets('unclaimed, Wi-Fi: no password screen, hostname at finish, the console sets the administrator', (
-    tester,
-  ) async {
+  testWidgets('unclaimed, Wi-Fi: no password or hostname screen, the console sets the administrator', (tester) async {
     final d = await start(tester, unclaimed());
     await tester.tapText('mica-a4e2e69e');
     expect(find.text('设置管理员'), findsNothing);
@@ -124,22 +122,19 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '连接'));
     await tester.pumpAndSettle();
     expect(find.text('已连接 Harbour，IP：192.168.8.41'), findsOneWidget);
-    await tester.type('主机名（可选）', '-bad-');
-    await tester.tapText('完成配网');
-    expect(find.text('主机名只能包含字母、数字和连字符，不能以连字符开头或结尾，最多 63 个字符'), findsOneWidget);
-    await tester.type('主机名（可选）', 'quay-7');
+    expect(find.text('主机名（可选）'), findsNothing);
     await tester.tapText('完成配网');
     expect(find.text('配网完成'), findsOneWidget);
     expect(find.text('已连接。Wi-Fi 192.168.8.41。'), findsOneWidget);
     expect(find.text('http://192.168.8.41'), findsOneWidget);
-    expect(find.text('http://quay-7.local'), findsOneWidget);
+    expect(find.text('http://mica-a4e2e69e.local'), findsOneWidget);
     expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。'), findsOneWidget);
     expect(find.text('设备热点仍开启，密码见设备标签。'), findsNothing);
     expect(find.text('设备热点的新密码'), findsNothing);
     expect(d.claimed, isFalse);
-    expect(d.hostname, 'quay-7');
+    expect(d.hostname, 'mica-a4e2e69e');
     expect(d.commands.map((c) => c['op']), ['getStatus', 'setWifi', 'finish']);
-    expect(d.commands.last, {'id': 3, 'op': 'finish', 'hostname': 'quay-7'});
+    expect(d.commands.last, {'id': 3, 'op': 'finish'});
   });
 
   testWidgets('unclaimed, wired DHCP: the hotspot stays on with its label key', (tester) async {

@@ -63,24 +63,24 @@ void main() {
     expect(c.connected, isTrue);
   });
 
-  test('unclaimed, N6: setWifi without a claim, finish with a hostname, nothing claimed', () async {
+  test('unclaimed, N6: setWifi without a claim, finish without fields, nothing claimed', () async {
     final (d, c) = await open(MockDevice(routers: routers, maxWrite: 40));
     await c.authenticateNone();
     final progress = <String>[];
     final e = await c.run('setWifi', wifiJoin, (e) => progress.add(e.event));
     expect(progress, ['connecting']);
     expect(e.json, {'id': 1, 'event': 'connected', 'ip': '192.168.8.41', 'hostname': 'mica-a4e2e69e'});
-    expect((await c.run('finish', {'hostname': '-bad'})).reason, 'invalid_hostname');
     var dropped = false;
     c.onDisconnect = () => dropped = true;
-    final f = await c.run('finish', {'hostname': 'quay-7'});
+    final f = await c.run('finish');
+    expect(d.commands.last, {'id': 2, 'op': 'finish'});
     expect(f.json, {
-      'id': 3,
+      'id': 2,
       'event': 'finished',
       'claimed': false,
-      'hostname': 'quay-7',
+      'hostname': 'mica-a4e2e69e',
       'interface': {'name': 'wlan0', 'kind': 'wifi', 'address': '192.168.8.41/24'},
-      'consoleUrls': ['http://192.168.8.41', 'http://quay-7.local'],
+      'consoleUrls': ['http://192.168.8.41', 'http://mica-a4e2e69e.local'],
       'ap': 'off',
     });
     await pumpEventQueue();

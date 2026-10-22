@@ -440,10 +440,10 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  Future<void> _finish(JoinedStep joined, String hostname) async {
+  Future<void> _finish(JoinedStep joined) async {
     _go(BusyStep(t.finishing));
     try {
-      final e = await _client!.run('finish', {if (hostname.isNotEmpty) 'hostname': hostname});
+      final e = await _client!.run('finish');
       if (e.event == 'finished') {
         final host = '${e['hostname']}';
         final r = e['interface'];
@@ -549,13 +549,7 @@ class _SetupPageState extends State<SetupPage> {
         onBack: _chooseNetwork,
         onSubmit: (psk) => _join(s.ssid, psk, s.hidden, s.status),
       ),
-      final JoinedStep s => JoinedView(
-        key: ObjectKey(s),
-        step: s,
-        // A 0.0.3 device took the hostname with the claim.
-        hostname: _legacy ? null : _info?.hostname ?? '',
-        onFinish: (hostname) => _finish(s, hostname),
-      ),
+      final JoinedStep s => JoinedView(step: s, onFinish: () => _finish(s)),
       final DoneStep s => DoneView(step: s),
     };
   }
@@ -983,55 +977,21 @@ class _WiredFormState extends State<WiredForm> {
   }
 }
 
-/// Step 8 done: the hostname, optional, goes with `finish`.
-class JoinedView extends StatefulWidget {
-  const JoinedView({super.key, required this.step, required this.hostname, required this.onFinish});
+/// Step 8 done: `finish` takes no fields.
+class JoinedView extends StatelessWidget {
+  const JoinedView({super.key, required this.step, required this.onFinish});
 
   final JoinedStep step;
-
-  /// The current hostname as the field's hint; null hides the field.
-  final String? hostname;
-  final void Function(String hostname) onFinish;
-
-  @override
-  State<JoinedView> createState() => _JoinedViewState();
-}
-
-class _JoinedViewState extends State<JoinedView> {
-  final _host = TextEditingController();
-  String _error = '';
-
-  @override
-  void dispose() {
-    _host.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final host = _host.text.trim();
-    if (host.isNotEmpty && !_hostnamePattern.hasMatch(host)) {
-      return setState(() => _error = AppLocalizations.of(context).hostnameInvalid);
-    }
-    widget.onFinish(host);
-  }
+  final VoidCallback onFinish;
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(widget.step.text, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
-        if (widget.hostname != null)
-          TextField(
-            controller: _host,
-            autocorrect: false,
-            enableSuggestions: false,
-            decoration: InputDecoration(labelText: t.hostnameOptional, hintText: widget.hostname),
-          ),
-        if (_error.isNotEmpty) ...[const SizedBox(height: 12), Alert(_error)],
+        Text(step.text, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
         const SizedBox(height: 16),
-        FilledButton(onPressed: _submit, child: Text(t.finish)),
+        FilledButton(onPressed: onFinish, child: Text(AppLocalizations.of(context).finish)),
       ],
     );
   }

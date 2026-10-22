@@ -398,10 +398,8 @@ class MockDevice {
       });
       return close();
     }
-    final host = c['hostname'];
-    if (host != null && (host is! String || !_hostname.hasMatch(host))) return failed('invalid_hostname');
+    if (c.keys.any((k) => k != 'id' && k != 'op')) return failed('bad_request');
     if (_auth == 'none' && claimedElsewhere) return failed('already_claimed');
-    if (host != null) hostname = host as String;
     final port =
         _broughtUp ??
         [
