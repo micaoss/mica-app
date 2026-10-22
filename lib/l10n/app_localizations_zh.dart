@@ -13,7 +13,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get title => 'mica 蓝牙配网';
 
   @override
-  String get lead => '用手机通过蓝牙把现场 Wi-Fi 发给 mica 设备，手机不需要连接设备热点。';
+  String get lead => '用手机通过蓝牙为 mica 设备配置 Wi-Fi 或有线网络，手机不需要连接设备热点。';
 
   @override
   String get switchTo => 'English';
@@ -231,11 +231,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get done => '配网完成';
 
   @override
-  String doneText(Object ssid, Object ip, Object hostname) {
-    return '请确认手机已连接到 $ssid，然后打开 http://$ip（备用 http://$hostname.local）';
-  }
-
-  @override
   String get openConsole => '打开控制台';
 
   @override
@@ -251,7 +246,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get closingIdle => '2 分钟无操作，设备断开了蓝牙。';
 
   @override
-  String get disconnectedUnclaimed => '蓝牙已断开，暂存的管理员设置已丢弃。重新连接后从验证重新开始。';
+  String get disconnectedUnclaimed => '蓝牙已断开，本次未完成的设置已撤销。重新连接后重新开始。';
 
   @override
   String get disconnectedClaimed => '蓝牙已断开。重新连接并验证后继续。';
@@ -305,4 +300,127 @@ class AppLocalizationsZh extends AppLocalizations {
   String failed(Object reason) {
     return '操作失败：$reason';
   }
+
+  @override
+  String get chooseHint => '设备通过 Wi-Fi 还是网线上网？';
+
+  @override
+  String get configureWired => '配置有线网络';
+
+  @override
+  String get ethernet => '有线';
+
+  @override
+  String get wifi => 'Wi-Fi';
+
+  @override
+  String get cableIn => '已插网线';
+
+  @override
+  String get noCable => '未插网线';
+
+  @override
+  String get linkUp => '已连接';
+
+  @override
+  String get wiredTitle => '有线网络';
+
+  @override
+  String get port => '网口';
+
+  @override
+  String get dhcp => '自动获取（DHCP）';
+
+  @override
+  String get staticAddress => '静态地址';
+
+  @override
+  String get addressLabel => '地址/前缀（如 192.168.1.40/24）';
+
+  @override
+  String get gateway => '网关（可选）';
+
+  @override
+  String get dns => 'DNS 服务器（可选，用空格或逗号分隔）';
+
+  @override
+  String get apply => '应用';
+
+  @override
+  String applying(Object name) {
+    return '正在配置 $name…';
+  }
+
+  @override
+  String wiredUp(Object name, Object address) {
+    return '$name 已配置，地址：$address';
+  }
+
+  @override
+  String doneConnected(Object kind, Object address) {
+    return '已连接。$kind $address。';
+  }
+
+  @override
+  String get consoleAt => '打开控制台：';
+
+  @override
+  String get doneClaim => '打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。';
+
+  @override
+  String get hotspotOn => '设备热点仍开启，密码见设备标签。';
+
+  @override
+  String get resultBadRequest => '请求格式错误';
+
+  @override
+  String get resultUnknownOp => '设备不支持此操作';
+
+  @override
+  String get resultUnknownInterface => '设备上没有这个有线网口';
+
+  @override
+  String get resultInvalidAddress => '地址应为 IPv4 地址加前缀，如 192.168.1.40/24';
+
+  @override
+  String get resultInvalidGateway => '网关应为 IPv4 地址';
+
+  @override
+  String get resultInvalidDns => 'DNS 服务器应为 IP 地址';
+
+  @override
+  String get resultValidationFailed => '设备拒绝了这组网络设置';
+
+  @override
+  String get resultNameInvalid => '网络设置不接受这个网口名称';
+
+  @override
+  String get resultGatewayOutOfSubnet => '网关不在该地址的子网内';
+
+  @override
+  String get resultAddressOverlap => '该子网与设备另一个接口的子网重叠';
+
+  @override
+  String get resultMetricDuplicate => '另一个接口的默认路由使用了相同的优先级';
+
+  @override
+  String get resultVlanDuplicate => '同一父接口上有两个 VLAN 使用了相同的 ID';
+
+  @override
+  String get resultVlanParentInvalid => 'VLAN 的父接口无效';
+
+  @override
+  String get resultBridgePortInvalid => '网桥端口无效';
+
+  @override
+  String get resultBridgePortAddressed => '该网口属于网桥，不能单独设置地址';
+
+  @override
+  String get resultBridgePortTaken => '该网口属于多个网桥';
+
+  @override
+  String get resultNoCarrier => '没有插网线。设置已保存，插上网线后生效';
+
+  @override
+  String get resultWiredDhcpTimeout => '30 秒内没有获得 DHCP 地址。设置已保存';
 }

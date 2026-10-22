@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @lead.
   ///
   /// In en, this message translates to:
-  /// **'Send a mica device the site\'s Wi-Fi over Bluetooth, without joining the device\'s hotspot.'**
+  /// **'Set up a mica device\'s Wi-Fi or wired network over Bluetooth, without joining the device\'s hotspot.'**
   String get lead;
 
   /// No description provided for @switchTo.
@@ -506,12 +506,6 @@ abstract class AppLocalizations {
   /// **'Setup finished'**
   String get done;
 
-  /// No description provided for @doneText.
-  ///
-  /// In en, this message translates to:
-  /// **'Make sure the phone is on {ssid}, then open http://{ip} (or http://{hostname}.local)'**
-  String doneText(Object ssid, Object ip, Object hostname);
-
   /// No description provided for @openConsole.
   ///
   /// In en, this message translates to:
@@ -545,7 +539,7 @@ abstract class AppLocalizations {
   /// No description provided for @disconnectedUnclaimed.
   ///
   /// In en, this message translates to:
-  /// **'Bluetooth disconnected and the staged administrator settings were dropped. Reconnect to start again from verification.'**
+  /// **'Bluetooth disconnected before setup finished; the device undid this session\'s changes. Reconnect to start again.'**
   String get disconnectedUnclaimed;
 
   /// No description provided for @disconnectedClaimed.
@@ -649,6 +643,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The operation failed: {reason}'**
   String failed(Object reason);
+
+  /// No description provided for @chooseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Does the device reach the network over Wi-Fi or a cable?'**
+  String get chooseHint;
+
+  /// No description provided for @configureWired.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up the wired port'**
+  String get configureWired;
+
+  /// No description provided for @ethernet.
+  ///
+  /// In en, this message translates to:
+  /// **'Ethernet'**
+  String get ethernet;
+
+  /// No description provided for @wifi.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi'**
+  String get wifi;
+
+  /// No description provided for @cableIn.
+  ///
+  /// In en, this message translates to:
+  /// **'cable in'**
+  String get cableIn;
+
+  /// No description provided for @noCable.
+  ///
+  /// In en, this message translates to:
+  /// **'no cable'**
+  String get noCable;
+
+  /// No description provided for @linkUp.
+  ///
+  /// In en, this message translates to:
+  /// **'connected'**
+  String get linkUp;
+
+  /// No description provided for @wiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wired network'**
+  String get wiredTitle;
+
+  /// No description provided for @port.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get port;
+
+  /// No description provided for @dhcp.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic (DHCP)'**
+  String get dhcp;
+
+  /// No description provided for @staticAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Static address'**
+  String get staticAddress;
+
+  /// No description provided for @addressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Address/prefix (e.g. 192.168.1.40/24)'**
+  String get addressLabel;
+
+  /// No description provided for @gateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway (optional)'**
+  String get gateway;
+
+  /// No description provided for @dns.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS servers (optional, separated by spaces or commas)'**
+  String get dns;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
+  /// No description provided for @applying.
+  ///
+  /// In en, this message translates to:
+  /// **'Setting up {name}…'**
+  String applying(Object name);
+
+  /// No description provided for @wiredUp.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is set up, address: {address}'**
+  String wiredUp(Object name, Object address);
+
+  /// No description provided for @doneConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected. {kind} {address}.'**
+  String doneConnected(Object kind, Object address);
+
+  /// No description provided for @consoleAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the console:'**
+  String get consoleAt;
+
+  /// No description provided for @doneClaim.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the console to set the administrator password. The console asks for the device code on the label.'**
+  String get doneClaim;
+
+  /// No description provided for @hotspotOn.
+  ///
+  /// In en, this message translates to:
+  /// **'The device\'s hotspot is still on, with the key on its label.'**
+  String get hotspotOn;
+
+  /// No description provided for @resultBadRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'The request was malformed'**
+  String get resultBadRequest;
+
+  /// No description provided for @resultUnknownOp.
+  ///
+  /// In en, this message translates to:
+  /// **'The device does not support this operation'**
+  String get resultUnknownOp;
+
+  /// No description provided for @resultUnknownInterface.
+  ///
+  /// In en, this message translates to:
+  /// **'The device has no such wired port'**
+  String get resultUnknownInterface;
+
+  /// No description provided for @resultInvalidAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'The address must be an IPv4 address with its prefix, e.g. 192.168.1.40/24'**
+  String get resultInvalidAddress;
+
+  /// No description provided for @resultInvalidGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway must be an IPv4 address'**
+  String get resultInvalidGateway;
+
+  /// No description provided for @resultInvalidDns.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS servers must be IP addresses'**
+  String get resultInvalidDns;
+
+  /// No description provided for @resultValidationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The device refused these network settings'**
+  String get resultValidationFailed;
+
+  /// No description provided for @resultNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The network settings do not accept this port\'s name'**
+  String get resultNameInvalid;
+
+  /// No description provided for @resultGatewayOutOfSubnet.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway is not in the address\'s subnet'**
+  String get resultGatewayOutOfSubnet;
+
+  /// No description provided for @resultAddressOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'This subnet overlaps another interface\'s'**
+  String get resultAddressOverlap;
+
+  /// No description provided for @resultMetricDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Another interface\'s default route has the same metric'**
+  String get resultMetricDuplicate;
+
+  /// No description provided for @resultVlanDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Two VLANs on the same parent have the same id'**
+  String get resultVlanDuplicate;
+
+  /// No description provided for @resultVlanParentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'A VLAN\'s parent is not valid'**
+  String get resultVlanParentInvalid;
+
+  /// No description provided for @resultBridgePortInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'A bridge port is not valid'**
+  String get resultBridgePortInvalid;
+
+  /// No description provided for @resultBridgePortAddressed.
+  ///
+  /// In en, this message translates to:
+  /// **'This port belongs to a bridge and has no addressing of its own'**
+  String get resultBridgePortAddressed;
+
+  /// No description provided for @resultBridgePortTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'The port is in more than one bridge'**
+  String get resultBridgePortTaken;
+
+  /// No description provided for @resultNoCarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'No cable is plugged in. The settings are saved and apply once one is'**
+  String get resultNoCarrier;
+
+  /// No description provided for @resultWiredDhcpTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'No DHCP address within 30 seconds. The settings are saved'**
+  String get resultWiredDhcpTimeout;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -13,13 +13,64 @@ import 'protocol/crypto.dart';
 // (find and connect) to step 9 (finish); step 10 is the console on the
 // router's LAN.
 
+class Port {
+  const Port(this.name, this.kind, this.carrier, this.address);
+
+  final String name;
+
+  /// `ethernet` or `wifi`.
+  final String kind;
+  final bool carrier;
+
+  /// IPv4 with its prefix, or null.
+  final String? address;
+}
+
 class Status {
-  const Status(this.wifiMode, this.connected, this.ssid, this.ip);
+  const Status(this.wifiMode, this.connected, this.ssid, this.ip, this.interfaces);
+
+  /// A `status` event: getStatus's answer, or the one that follows `ready`.
+  factory Status.of(DeviceEvent e) => Status(
+    '${e['wifiMode']}',
+    e['connected'] == true,
+    e['ssid'] is String ? e['ssid'] as String : null,
+    e['ip'] is String ? e['ip'] as String : null,
+    [
+      for (final p in e['interfaces'] is List ? e['interfaces'] as List : const [])
+        if (p is Map && p['name'] is String)
+          Port(
+            p['name'] as String,
+            '${p['kind']}',
+            p['carrier'] == true,
+            p['address'] is String ? p['address'] as String : null,
+          ),
+    ],
+  );
 
   final String wifiMode;
   final bool connected;
   final String? ssid, ip;
+  final List<Port> interfaces;
+
+  List<Port> get ethernet => interfaces.where((p) => p.kind == 'ethernet').toList();
 }
+
+final _ipv4Pattern = RegExp(r'^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$');
+
+bool isIpv4(String s) => _ipv4Pattern.hasMatch(s);
+
+/// An IPv4 or IPv6 address.
+bool isIp(String s) => isIpv4(s) || (s.contains(':') && Uri.tryParse('http://[$s]/')?.host.isNotEmpty == true);
+
+/// An IPv4 address with its prefix, as `static.address` takes it.
+bool isCidr(String s) {
+  final parts = s.split('/');
+  final prefix = parts.length == 2 && RegExp(r'^\d{1,2}$').hasMatch(parts[1]) ? int.parse(parts[1]) : -1;
+  return prefix >= 0 && prefix <= 32 && isIpv4(parts[0]);
+}
+
+/// DNS servers typed with spaces or commas between them.
+List<String> splitList(String s) => s.split(RegExp(r'[\s,]+')).where((x) => x.isNotEmpty).toList();
 
 class Network {
   const Network(this.ssid, this.signalDbm, this.security);
@@ -92,14 +143,36 @@ class PasswordStep extends Step {
   final Status status;
 }
 
+/// What the wired form holds, kept when an attempt fails.
+class Wired {
+  const Wired(this.port, {this.dhcp = true, this.address = '', this.gateway = '', this.dns = ''});
+  final String port;
+  final bool dhcp;
+  final String address, gateway, dns;
+}
+
+class WiredStep extends Step {
+  const WiredStep(this.status, [this.form]);
+  final Status status;
+  final Wired? form;
+}
+
+/// Wi-Fi or the wired port is up; [ip] is a 0.0.3 device's console address.
 class JoinedStep extends Step {
-  const JoinedStep(this.ssid, this.ip);
-  final String ssid, ip;
+  const JoinedStep(this.text, [this.ip]);
+  final String text;
+  final String? ip;
 }
 
 class DoneStep extends Step {
-  const DoneStep(this.ssid, this.ip, this.hostname, this.apPsk);
-  final String ssid, ip, hostname;
+  const DoneStep({required this.reached, required this.urls, required this.claimed, required this.apOn, this.apPsk});
+
+  /// `{kind, address}` of the port the session brought up.
+  final (String, String?)? reached;
+  final List<String> urls;
+  final bool claimed, apOn;
+
+  /// A 0.0.3 device's generated access-point key, shown once.
   final String? apPsk;
 }
 
@@ -124,7 +197,11 @@ class _SetupPageState extends State<SetupPage> {
   ProvisioningClient? _client;
   FoundDevice? _device;
   DeviceInfo? _info;
+  Status? _status;
   String _closing = '';
+
+  /// A core 0.0.3 device: it claims over BLE (`claim`) and has no `setNetwork`.
+  bool get _legacy => _info?.ops.contains('claim') ?? false;
 
   AppLocalizations get t => AppLocalizations.of(context);
 
@@ -161,6 +238,23 @@ class _SetupPageState extends State<SetupPage> {
     'invalid_password' => t.resultInvalidPassword,
     'invalid_hostname' => t.resultInvalidHostname,
     'already_claimed' => t.alreadyClaimed,
+    'bad_request' => t.resultBadRequest,
+    'unknown_op' => t.resultUnknownOp,
+    'unknown_interface' => t.resultUnknownInterface,
+    'invalid_address' => t.resultInvalidAddress,
+    'invalid_gateway' => t.resultInvalidGateway,
+    'invalid_dns' => t.resultInvalidDns,
+    'validation_failed' => t.resultValidationFailed,
+    'name_invalid' => t.resultNameInvalid,
+    'gateway_out_of_subnet' => t.resultGatewayOutOfSubnet,
+    'address_overlap' => t.resultAddressOverlap,
+    'metric_duplicate' => t.resultMetricDuplicate,
+    'vlan_duplicate' => t.resultVlanDuplicate,
+    'vlan_parent_invalid' => t.resultVlanParentInvalid,
+    'bridge_port_invalid' => t.resultBridgePortInvalid,
+    'bridge_port_addressed' => t.resultBridgePortAddressed,
+    'bridge_port_taken' => t.resultBridgePortTaken,
+    'no_carrier' => t.resultNoCarrier,
     _ => t.failed('${e.reason}'),
   };
 
@@ -181,6 +275,7 @@ class _SetupPageState extends State<SetupPage> {
     _device = d;
     _closing = '';
     _info = null;
+    _status = null;
     _go(BusyStep(t.connecting));
     final ProvisioningClient c;
     final DeviceInfo i;
@@ -212,19 +307,23 @@ class _SetupPageState extends State<SetupPage> {
       case Auth.tempCode:
         return _go(const AuthStep(SpakeMode.tempCode));
       case Auth.none:
+        final DeviceEvent? status;
         try {
-          await c.authenticateNone();
+          status = await c.authenticateNone();
         } catch (e) {
           return _broken(e);
         }
-        _go(const AdminStep());
+        if (status != null) _status = Status.of(status);
+        if (_legacy) return _go(const AdminStep());
+        await _showStatus(status);
     }
   }
 
   Future<void> _authenticate(SpakeMode mode, String secret) async {
     _go(BusyStep(t.verifying));
+    final DeviceEvent? status;
     try {
-      await _client!.authenticateSpake(mode, secret);
+      status = await _client!.authenticateSpake(mode, secret);
     } on SessionError catch (e) {
       switch (e.reason) {
         case 'auth_failed':
@@ -241,7 +340,7 @@ class _SetupPageState extends State<SetupPage> {
     } catch (e) {
       return _broken(e);
     }
-    await _showStatus();
+    await _showStatus(status);
   }
 
   Future<Status?> _getStatus() async {
@@ -250,13 +349,14 @@ class _SetupPageState extends State<SetupPage> {
       setState(() => _notice = _reason(e));
       return null;
     }
-    return Status('${e['wifiMode']}', e['connected'] == true, e['ssid'] as String?, e['ip'] as String?);
+    return _status = Status.of(e);
   }
 
-  Future<void> _showStatus([String notice = '']) async {
+  /// Step 5, from the status that came with `ready` when there is one.
+  Future<void> _showStatus([DeviceEvent? given]) async {
     try {
-      final s = await _getStatus();
-      if (s != null) _go(StatusStep(s), notice);
+      final s = given != null ? Status.of(given) : await _getStatus();
+      if (s != null) _go(StatusStep(s));
     } catch (e) {
       _broken(e);
     }
@@ -266,7 +366,10 @@ class _SetupPageState extends State<SetupPage> {
     _go(BusyStep(t.connecting));
     try {
       final e = await _client!.run('claim', {'password': password, if (hostname.isNotEmpty) 'hostname': hostname});
-      if (e.event == 'claimStaged') return await _showStatus();
+      if (e.event == 'claimStaged') {
+        final s = _status;
+        return s != null ? _go(StatusStep(s)) : await _showStatus();
+      }
       if (e.reason == 'already_claimed') return _stop(t.alreadyClaimed);
       _go(const AdminStep(), _reason(e));
     } catch (e) {
@@ -299,7 +402,7 @@ class _SetupPageState extends State<SetupPage> {
     _go(BusyStep(t.progress(ssid)));
     try {
       final e = await _client!.run('setWifi', {'ssid': ssid, 'psk': psk, 'hidden': hidden});
-      if (e.event == 'connected') return _go(JoinedStep(ssid, '${e['ip']}'));
+      if (e.event == 'connected') return _go(JoinedStep(t.success(ssid, '${e['ip']}'), '${e['ip']}'));
       switch (e.reason) {
         case 'ssid_not_found' || 'unsupported_security' || 'invalid_ssid' || 'no_radio':
           return await _chooseNetwork(_reason(e));
@@ -315,19 +418,54 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  Future<void> _finish(String ssid, String ip) async {
+  Future<void> _applyWired(Status status, Wired form) async {
+    _go(BusyStep(t.applying(form.port)));
+    final params = {
+      'interface': form.port,
+      if (form.dhcp) 'dhcp': true,
+      if (!form.dhcp)
+        'static': {
+          'address': form.address,
+          if (form.gateway.isNotEmpty) 'gateway': form.gateway,
+          if (form.dns.trim().isNotEmpty) 'dns': splitList(form.dns),
+        },
+    };
+    try {
+      final e = await _client!.run('setNetwork', params);
+      if (e.event == 'up') return _go(JoinedStep(t.wiredUp('${e['interface']}', '${e['address'] ?? '—'}')));
+      if (e.reason == 'already_claimed') return _stop(t.alreadyClaimed);
+      _go(WiredStep(status, form), e.reason == 'dhcp_timeout' ? t.resultWiredDhcpTimeout : _reason(e));
+    } catch (e) {
+      _broken(e);
+    }
+  }
+
+  Future<void> _finish(JoinedStep joined, String hostname) async {
     _go(BusyStep(t.finishing));
     try {
-      final e = await _client!.run('finish');
+      final e = await _client!.run('finish', {if (hostname.isNotEmpty) 'hostname': hostname});
       if (e.event == 'finished') {
+        final host = '${e['hostname']}';
+        final r = e['interface'];
+        final urls = e['consoleUrls'] is List
+            ? (e['consoleUrls'] as List).whereType<String>().where((u) => u.startsWith('http://')).toList()
+            : [if (joined.ip != null) 'http://${joined.ip}', 'http://$host.local'];
         // Set before the device disconnects, which follows `finished` at once.
-        _step = DoneStep(ssid, ip, '${e['hostname']}', e['apPsk'] is String ? e['apPsk'] as String : null);
-        _info = _info?.copyWith(claimed: e['claimed'] == true, hostname: '${e['hostname']}');
+        _step = DoneStep(
+          reached: r is Map && r['name'] is String
+              ? ('${r['kind']}', r['address'] is String ? r['address'] as String : null)
+              : null,
+          urls: urls,
+          claimed: e['claimed'] == true,
+          apOn: e['ap'] == 'on',
+          apPsk: e['apPsk'] is String ? e['apPsk'] as String : null,
+        );
+        _info = _info?.copyWith(claimed: e['claimed'] == true, hostname: host);
         return _go(_step);
       }
       if (e.reason == 'already_claimed') return _stop(t.alreadyClaimed);
       if (e.reason == 'not_claimed') return _go(const AdminStep(), _reason(e));
-      _go(JoinedStep(ssid, ip), _reason(e));
+      _go(joined, _reason(e));
     } catch (e) {
       _broken(e);
     }
@@ -342,15 +480,18 @@ class _SetupPageState extends State<SetupPage> {
         actions: [TextButton(onPressed: widget.onSwitchLanguage, child: Text(t.switchTo))],
       ),
       body: SafeArea(
-        child: ListView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          children: [
-            Text(t.lead, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 16),
-            if (info != null && _step is! FindStep) ...[DeviceCard(info: info), const SizedBox(height: 12)],
-            if (_notice.isNotEmpty) ...[Alert(_notice), const SizedBox(height: 12)],
-            _stepView(),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(t.lead, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 16),
+              if (info != null && _step is! FindStep) ...[DeviceCard(info: info), const SizedBox(height: 12)],
+              if (_notice.isNotEmpty) ...[Alert(_notice), const SizedBox(height: 12)],
+              _stepView(),
+            ],
+          ),
         ),
       ),
     );
@@ -384,7 +525,18 @@ class _SetupPageState extends State<SetupPage> {
       ),
       AuthStep(:final mode) => AuthForm(key: ValueKey(mode), mode: mode, onSubmit: (s) => _authenticate(mode, s)),
       AdminStep() => AdminForm(hostname: _info?.hostname ?? '', onSubmit: _claim),
-      StatusStep(:final status) => StatusView(status: status, onConfigure: _chooseNetwork),
+      StatusStep(:final status) => StatusView(
+        status: status,
+        wired: (_info?.ops.contains('setNetwork') ?? false) && status.ethernet.isNotEmpty,
+        onConfigure: _chooseNetwork,
+        onWired: () => _go(WiredStep(status)),
+      ),
+      final WiredStep s => WiredForm(
+        key: ObjectKey(s),
+        step: s,
+        onBack: () => _go(StatusStep(s.status)),
+        onSubmit: (form) => _applyWired(s.status, form),
+      ),
       final NetworkStep s => NetworkForm(
         key: ObjectKey(s),
         step: s,
@@ -397,13 +549,12 @@ class _SetupPageState extends State<SetupPage> {
         onBack: _chooseNetwork,
         onSubmit: (psk) => _join(s.ssid, psk, s.hidden, s.status),
       ),
-      JoinedStep(:final ssid, :final ip) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(t.success(ssid, ip), style: TextStyle(color: Theme.of(context).colorScheme.primary)),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: () => _finish(ssid, ip), child: Text(t.finish)),
-        ],
+      final JoinedStep s => JoinedView(
+        key: ObjectKey(s),
+        step: s,
+        // A 0.0.3 device took the hostname with the claim.
+        hostname: _legacy ? null : _info?.hostname ?? '',
+        onFinish: (hostname) => _finish(s, hostname),
       ),
       final DoneStep s => DoneView(step: s),
     };
@@ -673,10 +824,19 @@ class _AdminFormState extends State<AdminForm> {
 
 /// Step 5.
 class StatusView extends StatelessWidget {
-  const StatusView({super.key, required this.status, required this.onConfigure});
+  const StatusView({
+    super.key,
+    required this.status,
+    required this.wired,
+    required this.onConfigure,
+    required this.onWired,
+  });
 
   final Status status;
-  final VoidCallback onConfigure;
+
+  /// The device offers `setNetwork` and has an Ethernet port.
+  final bool wired;
+  final VoidCallback onConfigure, onWired;
 
   @override
   Widget build(BuildContext context) {
@@ -686,6 +846,12 @@ class StatusView extends StatelessWidget {
       'ap' => t.modeAp,
       _ => t.modeOff,
     };
+    final wifi = status.interfaces.isEmpty || status.interfaces.any((p) => p.kind == 'wifi');
+    String port(Port p) => [
+      p.kind == 'ethernet' ? t.ethernet : t.wifi,
+      p.kind == 'ethernet' ? (p.carrier ? t.cableIn : t.noCable) : (p.carrier ? t.linkUp : t.notConnected),
+      ?p.address,
+    ].join(' · ');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -695,9 +861,177 @@ class StatusView extends StatelessWidget {
           (t.wifiMode, mode),
           (t.connection, status.connected && status.ssid != null ? t.connectedTo(status.ssid!) : t.notConnected),
           (t.ip, status.ip ?? '—'),
+          for (final p in status.interfaces) (p.name, port(p)),
         ]),
+        if (wired) ...[const SizedBox(height: 12), Text(t.chooseHint)],
         const SizedBox(height: 16),
-        FilledButton(onPressed: onConfigure, child: Text(t.configureWifi)),
+        if (wifi) FilledButton(onPressed: onConfigure, child: Text(t.configureWifi)),
+        if (wifi && wired) const SizedBox(height: 8),
+        if (wired) FilledButton.tonal(onPressed: onWired, child: Text(t.configureWired)),
+      ],
+    );
+  }
+}
+
+/// The Ethernet port's addressing: DHCP by default, or static, checked here
+/// as the device would check it.
+class WiredForm extends StatefulWidget {
+  const WiredForm({super.key, required this.step, required this.onBack, required this.onSubmit});
+
+  final WiredStep step;
+  final VoidCallback onBack;
+  final void Function(Wired form) onSubmit;
+
+  @override
+  State<WiredForm> createState() => _WiredFormState();
+}
+
+class _WiredFormState extends State<WiredForm> {
+  late final _ports = widget.step.status.ethernet;
+  late String _port = widget.step.form?.port ?? _ports.first.name;
+  late bool _dhcp = widget.step.form?.dhcp ?? true;
+  late final _address = TextEditingController(text: widget.step.form?.address);
+  late final _gateway = TextEditingController(text: widget.step.form?.gateway);
+  late final _dns = TextEditingController(text: widget.step.form?.dns);
+  String _error = '';
+
+  @override
+  void dispose() {
+    _address.dispose();
+    _gateway.dispose();
+    _dns.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final t = AppLocalizations.of(context);
+    final address = _address.text.trim(), gateway = _gateway.text.trim();
+    final problem = _dhcp
+        ? ''
+        : !isCidr(address)
+        ? t.resultInvalidAddress
+        : gateway.isNotEmpty && !isIpv4(gateway)
+        ? t.resultInvalidGateway
+        : splitList(_dns.text).any((d) => !isIp(d))
+        ? t.resultInvalidDns
+        : '';
+    setState(() => _error = problem);
+    if (problem.isEmpty) {
+      widget.onSubmit(Wired(_port, dhcp: _dhcp, address: address, gateway: gateway, dns: _dns.text));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(t.wiredTitle, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _port,
+          decoration: InputDecoration(labelText: t.port),
+          items: [for (final p in _ports) DropdownMenuItem(value: p.name, child: Text(p.name))],
+          onChanged: (v) => setState(() => _port = v ?? _port),
+        ),
+        RadioGroup<bool>(
+          groupValue: _dhcp,
+          onChanged: (v) => setState(() => _dhcp = v ?? true),
+          child: Column(
+            children: [
+              RadioListTile(contentPadding: EdgeInsets.zero, value: true, title: Text(t.dhcp)),
+              RadioListTile(contentPadding: EdgeInsets.zero, value: false, title: Text(t.staticAddress)),
+            ],
+          ),
+        ),
+        if (!_dhcp) ...[
+          TextField(
+            controller: _address,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: InputDecoration(labelText: t.addressLabel),
+          ),
+          TextField(
+            controller: _gateway,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: InputDecoration(labelText: t.gateway),
+          ),
+          TextField(
+            controller: _dns,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: InputDecoration(labelText: t.dns),
+          ),
+        ],
+        if (_error.isNotEmpty) ...[const SizedBox(height: 12), Alert(_error)],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(onPressed: widget.onBack, child: Text(t.back)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(onPressed: _submit, child: Text(t.apply)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Step 8 done: the hostname, optional, goes with `finish`.
+class JoinedView extends StatefulWidget {
+  const JoinedView({super.key, required this.step, required this.hostname, required this.onFinish});
+
+  final JoinedStep step;
+
+  /// The current hostname as the field's hint; null hides the field.
+  final String? hostname;
+  final void Function(String hostname) onFinish;
+
+  @override
+  State<JoinedView> createState() => _JoinedViewState();
+}
+
+class _JoinedViewState extends State<JoinedView> {
+  final _host = TextEditingController();
+  String _error = '';
+
+  @override
+  void dispose() {
+    _host.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final host = _host.text.trim();
+    if (host.isNotEmpty && !_hostnamePattern.hasMatch(host)) {
+      return setState(() => _error = AppLocalizations.of(context).hostnameInvalid);
+    }
+    widget.onFinish(host);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(widget.step.text, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+        if (widget.hostname != null)
+          TextField(
+            controller: _host,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: InputDecoration(labelText: t.hostnameOptional, hintText: widget.hostname),
+          ),
+        if (_error.isNotEmpty) ...[const SizedBox(height: 12), Alert(_error)],
+        const SizedBox(height: 16),
+        FilledButton(onPressed: _submit, child: Text(t.finish)),
       ],
     );
   }
@@ -849,7 +1183,8 @@ class _PasswordFormState extends State<PasswordForm> {
   }
 }
 
-/// Step 9 done; the console (step 10) opens in the browser.
+/// Step 9 done; the console (step 10) opens in the browser, where the
+/// device is claimed.
 class DoneView extends StatelessWidget {
   const DoneView({super.key, required this.step});
 
@@ -858,18 +1193,29 @@ class DoneView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final apPsk = step.apPsk;
+    final reached = step.reached, apPsk = step.apPsk;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(t.done, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
-        SelectableText(t.doneText(step.ssid, step.ip, step.hostname)),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: () => launchUrl(Uri.parse('http://${step.ip}'), mode: LaunchMode.externalApplication),
-          child: Text(t.openConsole),
-        ),
+        if (reached != null)
+          Text(
+            t.doneConnected(reached.$1 == 'ethernet' ? t.ethernet : t.wifi, (reached.$2 ?? '—').split('/').first),
+            style: TextStyle(color: Theme.of(context).colorScheme.primary),
+          ),
+        if (!step.claimed) ...[const SizedBox(height: 8), Text(t.doneClaim)],
+        const SizedBox(height: 12),
+        Text(t.consoleAt),
+        for (final u in step.urls)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton(
+              onPressed: () => launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication),
+              child: Text(u),
+            ),
+          ),
+        if (step.apOn) ...[const SizedBox(height: 12), Text(t.hotspotOn)],
         if (apPsk != null) ...[
           const SizedBox(height: 16),
           Card(

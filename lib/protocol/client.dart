@@ -161,6 +161,8 @@ class ProvisioningClient {
   final _sessionQueue = <Map<String, dynamic>>[];
   Completer<Map<String, dynamic>>? _sessionWaiter;
   RecordCipher? _sealer, _opener;
+  final _early = <Uint8List>[];
+  Completer<DeviceEvent>? _statusWaiter;
   int _nextId = 1;
   ({int id, Completer<DeviceEvent> done, void Function(DeviceEvent)? onProgress})? _pending;
 
@@ -173,25 +175,28 @@ class ProvisioningClient {
     return info;
   }
 
-  /// `auth: none` (X25519).
-  Future<void> authenticateNone() async {
+  /// `auth: none` (X25519). Completes with the id-less `status` event that
+  /// `start {"status": true}` asks for, or null when the device's `ready` does
+  /// not echo the member (the phone then asks with `getStatus`).
+  Future<DeviceEvent?> authenticateNone() async {
     final x = X25519Start();
-    final ready = await _session({'t': 'start', 'auth': 'none', 'pub': base64.encode(x.pub)}, 'ready');
+    final ready = await _session({'t': 'start', 'auth': 'none', 'pub': base64.encode(x.pub), 'status': true}, 'ready');
     final SessionKeys keys;
     try {
       keys = x.finish(_b64(ready['pub']));
     } on FormatException {
       throw const ProtocolError('bad device key');
     }
-    _ready(keys);
+    return _ready(keys, ready);
   }
 
   /// `password` or `temp-code` (SPAKE2+). A wrong secret throws
   /// [SessionError] `auth_failed` with the attempts left, if the device said.
   /// A temp-code is used without its spaces and dashes; a password as typed.
-  Future<void> authenticateSpake(SpakeMode mode, String secret) async {
+  /// Completes like [authenticateNone].
+  Future<DeviceEvent?> authenticateSpake(SpakeMode mode, String secret) async {
     final pw = mode == SpakeMode.tempCode ? secret.replaceAll(RegExp(r'[\s-]'), '') : secret;
-    final params = await _session({'t': 'start', 'auth': mode.wire}, 'params');
+    final params = await _session({'t': 'start', 'auth': mode.wire, 'status': true}, 'params');
     final iterations = params['iterations'];
     if (iterations is! int || iterations < 10000 || iterations > 10000000) {
       throw const ProtocolError('iterations out of range');
@@ -209,13 +214,19 @@ class ProvisioningClient {
     } on FormatException {
       throw const ProtocolError('bad device share');
     }
-    await _session({'t': 'confirm', 'confirmP': base64.encode(done.confirmP)}, 'ready');
-    _ready(done.schedule.sessionKeys);
+    final ready = await _session({'t': 'confirm', 'confirmP': base64.encode(done.confirmP)}, 'ready');
+    return _ready(done.schedule.sessionKeys, ready);
   }
 
-  void _ready(SessionKeys keys) {
+  Future<DeviceEvent?> _ready(SessionKeys keys, Map<String, dynamic> ready) async {
     _sealer = RecordCipher(keys.phoneToDevice);
     _opener = RecordCipher(keys.deviceToPhone);
+    final status = ready['status'] == true ? _statusWaiter = Completer() : null;
+    // The status event follows ready at once and can arrive before this runs.
+    final early = List.of(_early);
+    _early.clear();
+    early.forEach(_eventRecord);
+    return status?.future;
   }
 
   /// Sends one operation; completes with its final event (`failed` included).
@@ -302,13 +313,23 @@ class ProvisioningClient {
   }
 
   void _eventFragment(Uint8List f) {
-    final DeviceEvent e;
     try {
       final whole = _eventIn.push(f);
       if (whole == null) return;
-      final opener = _opener;
-      if (opener == null) throw const FormatException('event before the session is ready');
-      final v = jsonDecode(utf8.decode(opener.open(whole)));
+      if (_opener == null) {
+        _early.add(whole);
+        return;
+      }
+      _eventRecord(whole);
+    } on FormatException catch (err) {
+      _fatal(ProtocolError(err.message));
+    }
+  }
+
+  void _eventRecord(Uint8List record) {
+    final DeviceEvent e;
+    try {
+      final v = jsonDecode(utf8.decode(_opener!.open(record)));
       if (v is! Map<String, dynamic>) throw const FormatException('event is not an object');
       e = DeviceEvent(v);
     } on FormatException catch (err) {
@@ -320,11 +341,15 @@ class ProvisioningClient {
   void _dispatch(DeviceEvent e) {
     if (e.id == null) {
       if (e.event == 'closing') onClosing('${e['reason']}');
+      if (e.event == 'status') {
+        _statusWaiter?.complete(e);
+        _statusWaiter = null;
+      }
       return;
     }
     final p = _pending;
     if (p == null || e.id != p.id) return;
-    if (e.event == 'connecting') {
+    if (e.event == 'connecting' || e.event == 'applying') {
       p.onProgress?.call(e);
       return;
     }
@@ -347,6 +372,8 @@ class ProvisioningClient {
     _sessionWaiter?.completeError(const DisconnectedError());
     _sessionWaiter = null;
     _sealer = _opener = null;
+    _statusWaiter?.completeError(const DisconnectedError());
+    _statusWaiter = null;
     _pending?.done.completeError(const DisconnectedError());
     _pending = null;
     onDisconnect();

@@ -13,7 +13,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get title => 'mica Bluetooth setup';
 
   @override
-  String get lead => 'Send a mica device the site\'s Wi-Fi over Bluetooth, without joining the device\'s hotspot.';
+  String get lead =>
+      'Set up a mica device\'s Wi-Fi or wired network over Bluetooth, without joining the device\'s hotspot.';
 
   @override
   String get switchTo => '中文';
@@ -234,11 +235,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get done => 'Setup finished';
 
   @override
-  String doneText(Object ssid, Object ip, Object hostname) {
-    return 'Make sure the phone is on $ssid, then open http://$ip (or http://$hostname.local)';
-  }
-
-  @override
   String get openConsole => 'Open the console';
 
   @override
@@ -255,7 +251,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get disconnectedUnclaimed =>
-      'Bluetooth disconnected and the staged administrator settings were dropped. Reconnect to start again from verification.';
+      'Bluetooth disconnected before setup finished; the device undid this session\'s changes. Reconnect to start again.';
 
   @override
   String get disconnectedClaimed => 'Bluetooth disconnected. Reconnect and verify to continue.';
@@ -309,4 +305,128 @@ class AppLocalizationsEn extends AppLocalizations {
   String failed(Object reason) {
     return 'The operation failed: $reason';
   }
+
+  @override
+  String get chooseHint => 'Does the device reach the network over Wi-Fi or a cable?';
+
+  @override
+  String get configureWired => 'Set up the wired port';
+
+  @override
+  String get ethernet => 'Ethernet';
+
+  @override
+  String get wifi => 'Wi-Fi';
+
+  @override
+  String get cableIn => 'cable in';
+
+  @override
+  String get noCable => 'no cable';
+
+  @override
+  String get linkUp => 'connected';
+
+  @override
+  String get wiredTitle => 'Wired network';
+
+  @override
+  String get port => 'Port';
+
+  @override
+  String get dhcp => 'Automatic (DHCP)';
+
+  @override
+  String get staticAddress => 'Static address';
+
+  @override
+  String get addressLabel => 'Address/prefix (e.g. 192.168.1.40/24)';
+
+  @override
+  String get gateway => 'Gateway (optional)';
+
+  @override
+  String get dns => 'DNS servers (optional, separated by spaces or commas)';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
+  String applying(Object name) {
+    return 'Setting up $name…';
+  }
+
+  @override
+  String wiredUp(Object name, Object address) {
+    return '$name is set up, address: $address';
+  }
+
+  @override
+  String doneConnected(Object kind, Object address) {
+    return 'Connected. $kind $address.';
+  }
+
+  @override
+  String get consoleAt => 'Open the console:';
+
+  @override
+  String get doneClaim =>
+      'Open the console to set the administrator password. The console asks for the device code on the label.';
+
+  @override
+  String get hotspotOn => 'The device\'s hotspot is still on, with the key on its label.';
+
+  @override
+  String get resultBadRequest => 'The request was malformed';
+
+  @override
+  String get resultUnknownOp => 'The device does not support this operation';
+
+  @override
+  String get resultUnknownInterface => 'The device has no such wired port';
+
+  @override
+  String get resultInvalidAddress => 'The address must be an IPv4 address with its prefix, e.g. 192.168.1.40/24';
+
+  @override
+  String get resultInvalidGateway => 'The gateway must be an IPv4 address';
+
+  @override
+  String get resultInvalidDns => 'DNS servers must be IP addresses';
+
+  @override
+  String get resultValidationFailed => 'The device refused these network settings';
+
+  @override
+  String get resultNameInvalid => 'The network settings do not accept this port\'s name';
+
+  @override
+  String get resultGatewayOutOfSubnet => 'The gateway is not in the address\'s subnet';
+
+  @override
+  String get resultAddressOverlap => 'This subnet overlaps another interface\'s';
+
+  @override
+  String get resultMetricDuplicate => 'Another interface\'s default route has the same metric';
+
+  @override
+  String get resultVlanDuplicate => 'Two VLANs on the same parent have the same id';
+
+  @override
+  String get resultVlanParentInvalid => 'A VLAN\'s parent is not valid';
+
+  @override
+  String get resultBridgePortInvalid => 'A bridge port is not valid';
+
+  @override
+  String get resultBridgePortAddressed => 'This port belongs to a bridge and has no addressing of its own';
+
+  @override
+  String get resultBridgePortTaken => 'The port is in more than one bridge';
+
+  @override
+  String get resultNoCarrier => 'No cable is plugged in. The settings are saved and apply once one is';
+
+  @override
+  String get resultWiredDhcpTimeout => 'No DHCP address within 30 seconds. The settings are saved';
 }

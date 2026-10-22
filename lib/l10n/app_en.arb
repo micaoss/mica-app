@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
   "title": "mica Bluetooth setup",
-  "lead": "Send a mica device the site's Wi-Fi over Bluetooth, without joining the device's hotspot.",
+  "lead": "Set up a mica device's Wi-Fi or wired network over Bluetooth, without joining the device's hotspot.",
   "switchTo": "中文",
   "radioUnsupported": "This phone has no Bluetooth Low Energy: set the device up through its hotspot",
   "radioUnauthorized": "Allow the app to use Bluetooth in the phone's settings",
@@ -109,20 +109,12 @@
   "finish": "Finish setup",
   "finishing": "Finishing…",
   "done": "Setup finished",
-  "doneText": "Make sure the phone is on {ssid}, then open http://{ip} (or http://{hostname}.local)",
-  "@doneText": {
-    "placeholders": {
-      "ssid": {},
-      "ip": {},
-      "hostname": {}
-    }
-  },
   "openConsole": "Open the console",
   "apPsk": "The device hotspot's new key",
   "apPskOnce": "Shown only this once: note it now.",
   "alreadyClaimed": "The device has been claimed another way",
   "closingIdle": "Nothing happened for 2 minutes, so the device disconnected.",
-  "disconnectedUnclaimed": "Bluetooth disconnected and the staged administrator settings were dropped. Reconnect to start again from verification.",
+  "disconnectedUnclaimed": "Bluetooth disconnected before setup finished; the device undid this session's changes. Reconnect to start again.",
   "disconnectedClaimed": "Bluetooth disconnected. Reconnect and verify to continue.",
   "reconnect": "Reconnect",
   "restart": "Start again",
@@ -144,5 +136,61 @@
     "placeholders": {
       "reason": {}
     }
-  }
+  },
+  "chooseHint": "Does the device reach the network over Wi-Fi or a cable?",
+  "configureWired": "Set up the wired port",
+  "ethernet": "Ethernet",
+  "wifi": "Wi-Fi",
+  "cableIn": "cable in",
+  "noCable": "no cable",
+  "linkUp": "connected",
+  "wiredTitle": "Wired network",
+  "port": "Port",
+  "dhcp": "Automatic (DHCP)",
+  "staticAddress": "Static address",
+  "addressLabel": "Address/prefix (e.g. 192.168.1.40/24)",
+  "gateway": "Gateway (optional)",
+  "dns": "DNS servers (optional, separated by spaces or commas)",
+  "apply": "Apply",
+  "applying": "Setting up {name}…",
+  "@applying": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "wiredUp": "{name} is set up, address: {address}",
+  "@wiredUp": {
+    "placeholders": {
+      "name": {},
+      "address": {}
+    }
+  },
+  "doneConnected": "Connected. {kind} {address}.",
+  "@doneConnected": {
+    "placeholders": {
+      "kind": {},
+      "address": {}
+    }
+  },
+  "consoleAt": "Open the console:",
+  "doneClaim": "Open the console to set the administrator password. The console asks for the device code on the label.",
+  "hotspotOn": "The device's hotspot is still on, with the key on its label.",
+  "resultBadRequest": "The request was malformed",
+  "resultUnknownOp": "The device does not support this operation",
+  "resultUnknownInterface": "The device has no such wired port",
+  "resultInvalidAddress": "The address must be an IPv4 address with its prefix, e.g. 192.168.1.40/24",
+  "resultInvalidGateway": "The gateway must be an IPv4 address",
+  "resultInvalidDns": "DNS servers must be IP addresses",
+  "resultValidationFailed": "The device refused these network settings",
+  "resultNameInvalid": "The network settings do not accept this port's name",
+  "resultGatewayOutOfSubnet": "The gateway is not in the address's subnet",
+  "resultAddressOverlap": "This subnet overlaps another interface's",
+  "resultMetricDuplicate": "Another interface's default route has the same metric",
+  "resultVlanDuplicate": "Two VLANs on the same parent have the same id",
+  "resultVlanParentInvalid": "A VLAN's parent is not valid",
+  "resultBridgePortInvalid": "A bridge port is not valid",
+  "resultBridgePortAddressed": "This port belongs to a bridge and has no addressing of its own",
+  "resultBridgePortTaken": "The port is in more than one bridge",
+  "resultNoCarrier": "No cable is plugged in. The settings are saved and apply once one is",
+  "resultWiredDhcpTimeout": "No DHCP address within 30 seconds. The settings are saved"
 }

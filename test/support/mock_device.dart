@@ -1,7 +1,9 @@
 // A mica device's end of protocol 1, for tests: the characteristics'
 // behaviour, the session state machine and the operations, written from
-// mica-core docs/ble-provisioning.md and not from the app's client. The
-// primitives come from the app's crypto.dart, which the vector tests check.
+// mica-core docs/ble-provisioning.md (b813915) and not from the app's client.
+// A device whose ops list `claim` behaves as core 0.0.3 did (claim staged in
+// the session, committed by finish). The primitives come from the app's
+// crypto.dart, which the vector tests check.
 
 import 'dart:async';
 import 'dart:convert';
@@ -26,8 +28,22 @@ class WifiRouter {
   final String ip;
 }
 
+class MockPort {
+  MockPort(this.name, this.kind, {this.carrier = false, this.address});
+
+  final String name, kind;
+  bool carrier;
+  String? address;
+
+  Json toJson() => {'name': name, 'kind': kind, 'carrier': carrier, 'address': address};
+}
+
+const opsN6 = ['getStatus', 'scanWifi', 'setWifi', 'setNetwork', 'finish'];
+const opsLegacy = ['getStatus', 'scanWifi', 'claim', 'setWifi', 'finish'];
+
 final _hostname = RegExp(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$', caseSensitive: false);
 final _psk = RegExp(r'^(?:[\x20-\x7E]{8,63}|[0-9a-fA-F]{64})$');
+final _ipv4 = RegExp(r'^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$');
 
 class MockDevice {
   MockDevice({
@@ -36,10 +52,11 @@ class MockDevice {
     String hostname = 'mica-a4e2e69e',
     bool claimed = false,
     String? auth,
-    this.ops = const ['getStatus', 'scanWifi', 'claim', 'setWifi', 'finish'],
+    this.ops = opsN6,
     this.maxWrite = 20,
     this.notifySize = 20,
     String wifiMode = 'ap',
+    List<MockPort>? ports,
     this.networks = const [],
     this.routers = const {},
     this.secret = '',
@@ -47,12 +64,17 @@ class MockDevice {
     this.maxAttempts = 5,
     this.claimedElsewhere = false,
     this.busy = false,
+    this.echoStatus = true,
+    this.wiredFail,
+    this.leaseAddress = '192.168.8.50/24',
     this.generatedApPsk = 'harbour-ap-key-7f3a',
     this.connectDelay = const Duration(milliseconds: 5),
   }) : _hostname0 = hostname,
        claimed = claimed,
        auth = auth ?? (claimed ? 'password' : 'none'),
        attemptsLeft = maxAttempts,
+       ports =
+           ports ?? [MockPort('end0', 'ethernet', carrier: true), MockPort('wlan0', 'wifi', address: '192.168.4.1/24')],
        wifi = (mode: wifiMode, connected: wifiMode == 'client', ssid: null, ip: null);
 
   final int protocol;
@@ -60,6 +82,7 @@ class MockDevice {
   final String _hostname0;
   final List<String> ops;
   final int maxWrite, notifySize;
+  final List<MockPort> ports;
   final List<Json> networks;
   final Map<String, WifiRouter> routers;
 
@@ -72,6 +95,16 @@ class MockDevice {
 
   /// Another phone holds the connection: GATT reads and writes are refused.
   final bool busy;
+
+  /// `ready` echoes `"status": true` and an id-less status event follows; a
+  /// device that predates the member does neither.
+  final bool echoStatus;
+
+  /// A `setNetwork` failure reason to answer instead of bringing the port up.
+  final String? wiredFail;
+  final String leaseAddress;
+
+  /// Legacy (`claim` in ops): the key generated at `finish` when the claim gave none.
   final String generatedApPsk;
   final Duration connectDelay;
 
@@ -93,11 +126,14 @@ class MockDevice {
   String? _auth;
   VerifierRecord? _record;
   VerifierResponse? _spake;
+  bool _wantStatus = false;
   RecordCipher? _commandCipher, _eventCipher;
   bool _running = false;
+  MockPort? _broughtUp;
   Future<void> _chain = Future.value();
 
   bool get connected => _link != null;
+  bool get legacy => ops.contains('claim');
 
   /// A central connects; the transport is already subscribed.
   MockTransport connect() {
@@ -173,9 +209,20 @@ class MockDevice {
     await _notify(link._events.add, cipher.seal(utf8.encode(jsonEncode(m))));
   }
 
-  Future<void> _keys(SessionKeys k) async {
+  Json _status() => {
+    'wifiMode': wifi.mode,
+    'connected': wifi.connected,
+    'ssid': wifi.ssid,
+    'ip': wifi.ip,
+    'interfaces': [for (final p in ports) p.toJson()],
+  };
+
+  Future<void> _ready(SessionKeys k, Json ready) async {
     _commandCipher = RecordCipher(k.phoneToDevice);
     _eventCipher = RecordCipher(k.deviceToPhone);
+    final status = _wantStatus && echoStatus;
+    await _sendSession({...ready, if (status) 'status': true});
+    if (status) await _event({'event': 'status', ..._status()});
   }
 
   Future<void> _onSession(Json m) async {
@@ -186,6 +233,7 @@ class MockDevice {
       case 'start':
         _auth = null;
         _commandCipher = _eventCipher = null;
+        _wantStatus = m['status'] == true;
         if (auth == 'password-unavailable') return error('password_unavailable');
         if (m['auth'] != auth) return error('unsupported_auth');
         if (attemptsLeft <= 0) return error('locked', {'retryAfter': 600});
@@ -196,9 +244,11 @@ class MockDevice {
           final s = x25519(private, phonePub);
           final salt = sha256(concat([utf8Bytes('mica-provisioning/1 none'), phonePub, devicePub]));
           final k = hkdf(salt, s, 'mica-provisioning/1 session keys', 64);
-          await _keys((phoneToDevice: k.sublist(0, 32), deviceToPhone: k.sublist(32)));
           _auth = 'none';
-          return _sendSession({'t': 'ready', 'pub': base64.encode(devicePub)});
+          return _ready(
+            (phoneToDevice: k.sublist(0, 32), deviceToPhone: k.sublist(32)),
+            {'t': 'ready', 'pub': base64.encode(devicePub)},
+          );
         }
         final salt = Uint8List.fromList(List.generate(16, (i) => i * 17));
         _record = VerifierRecord.register(secret, salt, iterations);
@@ -226,11 +276,18 @@ class MockDevice {
               : error('auth_failed', {'attemptsLeft': attemptsLeft});
         }
         attemptsLeft = maxAttempts;
-        await _keys(_spake!.schedule.sessionKeys);
+        final keys = _spake!.schedule.sessionKeys;
         _spake = null;
-        return _sendSession({'t': 'ready'});
+        return _ready(keys, {'t': 'ready'});
     }
     return error('bad_message');
+  }
+
+  bool _cidr(Object? v) {
+    if (v is! String) return false;
+    final parts = v.split('/');
+    final prefix = parts.length == 2 ? int.tryParse(parts[1]) : null;
+    return prefix != null && prefix >= 0 && prefix <= 32 && _ipv4.hasMatch(parts[0]);
   }
 
   Future<void> _onCommand(Uint8List record) async {
@@ -246,16 +303,10 @@ class MockDevice {
     final id = c['id'];
     Future<void> failed(String reason) => _event({'id': id, 'event': 'failed', 'reason': reason});
     if (_running) return failed('busy');
+    if (!ops.contains(c['op'])) return failed('unknown_op');
     switch (c['op']) {
       case 'getStatus':
-        return _event({
-          'id': id,
-          'event': 'status',
-          'wifiMode': wifi.mode,
-          'connected': wifi.connected,
-          'ssid': wifi.ssid,
-          'ip': wifi.ip,
-        });
+        return _event({'id': id, 'event': 'status', ..._status()});
       case 'scanWifi':
         if (wifi.mode == 'ap') return failed('ap_active');
         return _event({'id': id, 'event': 'networks', 'networks': networks});
@@ -271,7 +322,8 @@ class MockDevice {
         staged = (password: pw, hostname: host as String?, apPsk: c['apPsk'] as String?);
         return _event({'id': id, 'event': 'claimStaged'});
       case 'setWifi':
-        if (_auth == 'none' && staged == null) return failed('not_claimed');
+        if (legacy && _auth == 'none' && staged == null) return failed('not_claimed');
+        if (_auth == 'none' && claimedElsewhere) return failed('already_claimed');
         final ssid = c['ssid'], psk = c['psk'];
         if (ssid is! String || ssid.isEmpty || utf8.encode(ssid).length > 32) return failed('invalid_ssid');
         if (psk is! String || (psk.isNotEmpty && !_psk.hasMatch(psk))) return failed('invalid_psk');
@@ -288,34 +340,85 @@ class MockDevice {
               if (r.fail != null) return failed(r.fail!);
               if (r.psk != psk) return failed('wrong_password');
               wifi = (mode: 'client', connected: true, ssid: ssid, ip: r.ip);
+              final w = ports.firstWhere((p) => p.kind == 'wifi');
+              w
+                ..carrier = true
+                ..address = '${r.ip}/24';
+              _broughtUp = w;
               return _event({'id': id, 'event': 'connected', 'ip': r.ip, 'hostname': staged?.hostname ?? hostname});
             }),
           ),
         );
         return;
+      case 'setNetwork':
+        if (_auth == 'none' && claimedElsewhere) return failed('already_claimed');
+        final name = c['interface'], dhcp = c['dhcp'], st = c['static'];
+        if ((dhcp == true) == (st != null) || (dhcp != null && dhcp != true)) return failed('bad_request');
+        final matches = ports.where((p) => p.name == name && p.kind == 'ethernet');
+        if (matches.isEmpty) return failed('unknown_interface');
+        final port = matches.first;
+        if (st != null) {
+          if (st is! Map || !_cidr(st['address'])) return failed('invalid_address');
+          final gw = st['gateway'];
+          if (gw != null && (gw is! String || !_ipv4.hasMatch(gw))) return failed('invalid_gateway');
+          final dns = st['dns'];
+          if (dns != null && (dns is! List || dns.any((d) => d is! String || d.isEmpty))) return failed('invalid_dns');
+        }
+        await _event({'id': id, 'event': 'applying'});
+        if (wiredFail != null) return failed(wiredFail!);
+        port.address = st != null ? (st as Map)['address'] as String : leaseAddress;
+        _broughtUp = port;
+        return _event({'id': id, 'event': 'up', 'interface': port.name, 'address': port.address});
       case 'finish':
-        if (_auth != 'none') {
-          await _event({'id': id, 'event': 'finished', 'claimed': true, 'hostname': hostname});
-          return close();
-        }
-        if (claimedElsewhere) {
-          staged = null;
-          return failed('already_claimed');
-        }
-        final s = staged;
-        if (s == null) return failed('not_claimed');
-        claimed = true;
-        hostname = s.hostname ?? hostname;
-        await _event({
-          'id': id,
-          'event': 'finished',
-          'claimed': true,
-          'hostname': hostname,
-          if (s.apPsk == null) 'apPsk': generatedApPsk,
-        });
-        return close();
+        return _finish(id, c);
     }
-    return failed('unknown_op');
+  }
+
+  Future<void> _finish(Object? id, Json c) async {
+    Future<void> failed(String reason) => _event({'id': id, 'event': 'failed', 'reason': reason});
+    if (legacy) {
+      if (_auth != 'none') {
+        await _event({'id': id, 'event': 'finished', 'claimed': true, 'hostname': hostname});
+        return close();
+      }
+      if (claimedElsewhere) {
+        staged = null;
+        return failed('already_claimed');
+      }
+      final s = staged;
+      if (s == null) return failed('not_claimed');
+      claimed = true;
+      hostname = s.hostname ?? hostname;
+      await _event({
+        'id': id,
+        'event': 'finished',
+        'claimed': true,
+        'hostname': hostname,
+        if (s.apPsk == null) 'apPsk': generatedApPsk,
+      });
+      return close();
+    }
+    final host = c['hostname'];
+    if (host != null && (host is! String || !_hostname.hasMatch(host))) return failed('invalid_hostname');
+    if (_auth == 'none' && claimedElsewhere) return failed('already_claimed');
+    if (host != null) hostname = host as String;
+    final port =
+        _broughtUp ??
+        [
+          ...ports.where((p) => p.kind == 'ethernet' && p.address != null),
+          ...ports.where((p) => p.kind != 'ethernet' && p.address != null),
+        ].firstOrNull;
+    final address = port?.address?.split('/').first;
+    await _event({
+      'id': id,
+      'event': 'finished',
+      'claimed': claimed,
+      'hostname': hostname,
+      'interface': port == null ? null : {'name': port.name, 'kind': port.kind, 'address': port.address},
+      'consoleUrls': [if (address != null) 'http://$address', 'http://$hostname.local'],
+      'ap': wifi.mode == 'ap' ? 'on' : 'off',
+    });
+    return close();
   }
 }
 
