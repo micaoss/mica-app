@@ -1,0 +1,32 @@
+name: ci
+# Every push to main and pull request: analyze and test on Flutter 3.47.7
+# (the SDK tools/flutter.Dockerfile pins), and check that the test vectors are
+# still mica-core's. No store builds yet.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
+      - name: vectors match mica-core docs/ble-provisioning.md
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/micaoss/mica-core/main/docs/ble-provisioning.md -o /tmp/ble-provisioning.md
+          python3 -I tools/extract_vectors.py /tmp/ble-provisioning.md | diff -u test/protocol/vectors.json -

@@ -1,7 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
-String hex(List<int> bytes) =>
-    bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+String hex(List<int> bytes) => bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
 Uint8List fromHex(String text) {
   if (text.length.isOdd) throw const FormatException('odd hex length');
@@ -10,6 +10,16 @@ Uint8List fromHex(String text) {
     out[i] = int.parse(text.substring(2 * i, 2 * i + 2), radix: 16);
   }
   return out;
+}
+
+Uint8List utf8Bytes(String text) => Uint8List.fromList(utf8.encode(text));
+
+Uint8List concat(List<List<int>> parts) {
+  final out = BytesBuilder(copy: false);
+  for (final p in parts) {
+    out.add(p);
+  }
+  return out.toBytes();
 }
 
 /// Big-endian bytes of [value], left-padded to [length].
@@ -32,12 +42,10 @@ BigInt bytesBigInt(List<int> bytes) {
   return v;
 }
 
-/// RFC 9382's `len(S) || S`: an 8-byte little-endian length, then the bytes.
-void writeLengthPrefixed(BytesBuilder out, List<int> bytes) {
+/// `len(S) || S`: an 8-byte little-endian length, then the bytes.
+Uint8List len8(List<int> bytes) {
   final len = ByteData(8)..setUint64(0, bytes.length, Endian.little);
-  out
-    ..add(len.buffer.asUint8List())
-    ..add(bytes);
+  return concat([len.buffer.asUint8List(), bytes]);
 }
 
 /// Compares in time independent of where the first difference is.

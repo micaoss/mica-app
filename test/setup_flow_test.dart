@@ -1,0 +1,321 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mica_app/ble.dart';
+import 'package:mica_app/main.dart';
+import 'package:mica_app/protocol/client.dart';
+import 'package:mica_app/protocol/crypto.dart';
+import 'package:mica_app/setup_page.dart';
+
+import 'support/mock_device.dart';
+
+const routers = {'Harbour': WifiRouter('harbour-wifi-1', ip: '192.168.8.41')};
+const networks = [
+  {'ssid': 'Harbour', 'signalDbm': -61, 'security': 'wpa2-psk', 'channel': 6},
+  {'ssid': 'Harbour', 'signalDbm': -48, 'security': 'wpa2-psk', 'channel': 36},
+  {'ssid': 'Marina Guest', 'signalDbm': -70, 'security': 'open', 'channel': 11},
+  {'ssid': '', 'signalDbm': -40, 'security': 'wpa2-psk', 'channel': 1},
+];
+
+/// The phone's Bluetooth with one device in range.
+class FakeBluetooth implements Bluetooth {
+  FakeBluetooth(this.device, {this.radioState = RadioState.on});
+
+  final MockDevice device;
+  final RadioState radioState;
+  int connects = 0;
+
+  @override
+  Stream<RadioState> get state => Stream.value(radioState);
+
+  @override
+  Stream<List<FoundDevice>> scan() => Stream.value([FoundDevice('AA:BB', device.hostname, -52)]);
+
+  @override
+  Future<Transport> connect(FoundDevice d) async {
+    connects++;
+    return device.connect();
+  }
+}
+
+Future<({BigInt w0, BigInt w1})> inlineKdf(String pw, List<int> salt, int iterations) async =>
+    spakeScalars(pw, salt, iterations);
+
+Future<MockDevice> start(
+  WidgetTester tester,
+  MockDevice device, {
+  String lang = 'zh',
+  RadioState radio = RadioState.on,
+}) async {
+  await tester.pumpWidget(
+    MicaApp(
+      key: UniqueKey(),
+      radio: FakeBluetooth(device, radioState: radio),
+      kdf: inlineKdf,
+      locale: Locale(lang),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return device;
+}
+
+MockDevice unclaimed({Map<String, WifiRouter> routers = routers, bool claimedElsewhere = false}) =>
+    MockDevice(routers: routers, networks: networks, claimedElsewhere: claimedElsewhere);
+
+extension on WidgetTester {
+  Future<void> tapText(String text) async {
+    await tap(find.text(text));
+    await pumpAndSettle();
+  }
+
+  Future<void> type(String label, String text) async {
+    await enterText(find.widgetWithText(TextField, label), text);
+    await pump();
+  }
+
+  Future<void> claimAndReachNetwork() async {
+    await tapText('mica-a4e2e69e');
+    expect(find.text('设置管理员'), findsOneWidget);
+    await type('管理员密码（至少 8 位）', 'admin-pass-1');
+    await type('再次输入密码', 'admin-pass-1');
+    await type('主机名（可选）', 'quay-7');
+    await tapText('下一步');
+    expect(find.text('当前状态'), findsOneWidget);
+    await tapText('配置 Wi-Fi');
+    expect(find.text('设备当前为 Wi-Fi 接入点模式，不能扫描，请输入网络名称。'), findsOneWidget);
+  }
+
+  Future<void> enterNetwork(String ssid, String psk) async {
+    await type('网络名称', ssid);
+    await tapText('下一步');
+    expect(find.text('连接 $ssid'), findsWidgets);
+    if (psk.isNotEmpty) await type('Wi-Fi 密码（开放网络留空）', psk);
+    await tap(find.widgetWithText(FilledButton, '连接'));
+    await pumpAndSettle();
+  }
+}
+
+void main() {
+  testWidgets('steps 1-9 on an unclaimed device in access-point mode, apPsk shown once', (tester) async {
+    final d = await start(tester, unclaimed());
+    expect(find.text('列出正在配网的设备，按主机名（如 mica-a4e2e69e）选择。不需要蓝牙配对。'), findsOneWidget);
+    await tester.claimAndReachNetwork();
+    await tester.type('网络名称', 'Harbour');
+    await tester.tapText('下一步');
+    expect(find.text('设备将关闭热点并连接 Harbour，连着设备热点的终端会断开'), findsOneWidget);
+    await tester.type('Wi-Fi 密码（开放网络留空）', 'harbour-wifi-1');
+    await tester.tap(find.widgetWithText(FilledButton, '连接'));
+    await tester.pumpAndSettle();
+    expect(find.text('已连接 Harbour，IP：192.168.8.41'), findsOneWidget);
+    await tester.tapText('完成配网');
+    expect(find.text('请确认手机已连接到 Harbour，然后打开 http://192.168.8.41（备用 http://quay-7.local）'), findsOneWidget);
+    expect(find.text('打开控制台'), findsOneWidget);
+    expect(find.text('harbour-ap-key-7f3a'), findsOneWidget);
+    expect(find.text('只显示这一次，请现在记下。'), findsOneWidget);
+    expect(d.claimed, isTrue);
+    expect(d.connected, isFalse);
+    expect(d.commands.firstWhere((c) => c['op'] == 'claim'), {
+      'id': 1,
+      'op': 'claim',
+      'password': 'admin-pass-1',
+      'hostname': 'quay-7',
+    });
+    expect(d.commands.firstWhere((c) => c['op'] == 'setWifi'), {
+      'id': 4,
+      'op': 'setWifi',
+      'ssid': 'Harbour',
+      'psk': 'harbour-wifi-1',
+      'hidden': false,
+    });
+    expect(d.largestWrite, lessThanOrEqualTo(20));
+  });
+
+  for (final (reason, ssid, psk, text, back) in [
+    ('wrong_password', 'Harbour', 'not-the-key', 'Wi-Fi 密码错误', 7),
+    ('ssid_not_found', 'Nowhere', 'whatever-1', '未找到该网络，请检查名称或靠近路由器', 6),
+    ('dhcp_timeout', 'Marina', 'marina-key-1', '已连接但未获得 IP，请检查路由器', 7),
+    ('unsupported_security', 'Corp', 'corp-key-12', '设备不支持该网络的加密方式', 6),
+    ('busy', 'Busy', 'busy-key-12', '设备忙，请稍候重试', 7),
+  ]) {
+    testWidgets('step 8: $reason shows its text and returns to step $back', (tester) async {
+      await start(
+        tester,
+        unclaimed(
+          routers: {
+            ...routers,
+            'Marina': const WifiRouter('marina-key-1', fail: 'dhcp_timeout'),
+            'Corp': const WifiRouter('corp-key-12', fail: 'unsupported_security'),
+            'Busy': const WifiRouter('busy-key-12', fail: 'busy'),
+          },
+        ),
+      );
+      await tester.claimAndReachNetwork();
+      await tester.enterNetwork(ssid, psk);
+      expect(find.text(text), findsOneWidget);
+      if (back == 7) {
+        expect(find.text('连接 $ssid'), findsOneWidget);
+        expect(tester.widget<TextField>(find.widgetWithText(TextField, 'Wi-Fi 密码（开放网络留空）')).controller!.text, '');
+      } else {
+        // Back at the network step; the device left access-point mode, so it scanned.
+        expect(find.text('选择网络'), findsOneWidget);
+        expect(find.text('Harbour'), findsOneWidget);
+      }
+    });
+  }
+
+  testWidgets('step 4 checks the password twice and the hostname', (tester) async {
+    final d = await start(tester, unclaimed());
+    await tester.tapText('mica-a4e2e69e');
+    await tester.type('管理员密码（至少 8 位）', 'short');
+    await tester.tapText('下一步');
+    expect(find.text('密码至少 8 位'), findsOneWidget);
+    await tester.type('管理员密码（至少 8 位）', 'short-but-now-long');
+    await tester.type('再次输入密码', 'different-one');
+    await tester.tapText('下一步');
+    expect(find.text('两次输入的密码不一致'), findsOneWidget);
+    await tester.type('再次输入密码', 'short-but-now-long');
+    await tester.type('主机名（可选）', '-bad-');
+    await tester.tapText('下一步');
+    expect(find.text('主机名只能包含字母、数字和连字符，不能以连字符开头或结尾，最多 63 个字符'), findsOneWidget);
+    expect(d.commands.where((c) => c['op'] == 'claim'), isEmpty);
+    await tester.type('主机名（可选）', '');
+    await tester.tapText('下一步');
+    expect(d.commands.firstWhere((c) => c['op'] == 'claim'), {
+      'id': 1,
+      'op': 'claim',
+      'password': 'short-but-now-long',
+    });
+  });
+
+  testWidgets('claimed device: a wrong password tells the attempts left; then scan, join, finish', (tester) async {
+    final d = await start(
+      tester,
+      MockDevice(claimed: true, secret: 'harbour-pw-1', wifiMode: 'client', routers: routers, networks: networks),
+    );
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('已认领'), findsOneWidget);
+    await tester.type('管理员密码', 'wrong-pw');
+    await tester.tapText('验证');
+    expect(find.text('密码错误，还可尝试 4 次'), findsOneWidget);
+    await tester.type('管理员密码', 'harbour-pw-1');
+    await tester.tapText('验证');
+    expect(find.text('当前状态'), findsOneWidget);
+    expect(find.text('Wi-Fi 客户端'), findsOneWidget);
+    await tester.tapText('配置 Wi-Fi');
+    // Merged by name, strongest first; the hidden network has no row.
+    expect(find.text('Harbour'), findsOneWidget);
+    expect(find.text('wpa2-psk · -48 dBm'), findsOneWidget);
+    expect(find.text('开放 · -70 dBm'), findsOneWidget);
+    await tester.tapText('Harbour');
+    expect(find.text('设备将关闭热点并连接 Harbour，连着设备热点的终端会断开'), findsNothing);
+    await tester.type('Wi-Fi 密码（开放网络留空）', 'harbour-wifi-1');
+    await tester.tap(find.widgetWithText(FilledButton, '连接'));
+    await tester.pumpAndSettle();
+    await tester.tapText('完成配网');
+    expect(find.text('请确认手机已连接到 Harbour，然后打开 http://192.168.8.41（备用 http://mica-a4e2e69e.local）'), findsOneWidget);
+    expect(find.text('设备热点的新密码'), findsNothing);
+    expect(d.sessionLog.where((m) => m['t'] == 'start').length, 2);
+  });
+
+  testWidgets('temp-code: typed with spaces, used without', (tester) async {
+    final d = await start(tester, MockDevice(claimed: true, auth: 'temp-code', secret: '40718263'));
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('控制台“蓝牙配网”中显示的 8 位数字'), findsOneWidget);
+    await tester.type('临时配网码', '4071 8263');
+    await tester.tapText('验证');
+    expect(find.text('当前状态'), findsOneWidget);
+    expect(d.sessionLog.first, {'t': 'start', 'auth': 'temp-code'});
+  });
+
+  testWidgets('lockout stops with the time to wait', (tester) async {
+    await start(tester, MockDevice(claimed: true, secret: 'harbour-pw-1', maxAttempts: 1));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.type('管理员密码', 'wrong-pw');
+    await tester.tapText('验证');
+    expect(find.text('密码错误，还可尝试 0 次'), findsOneWidget);
+    await tester.tapText('验证');
+    expect(find.text('错误次数过多，设备已锁定，请在 10 分钟后重试'), findsOneWidget);
+    expect(find.text('重新开始'), findsOneWidget);
+  });
+
+  testWidgets('password-unavailable and an unknown protocol stop at step 2', (tester) async {
+    final d = await start(tester, MockDevice(claimed: true, auth: 'password-unavailable'));
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('请先登录一次控制台以启用蓝牙恢复'), findsOneWidget);
+    expect(d.sessionLog, isEmpty);
+    await start(tester, MockDevice(protocol: 2));
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('请升级应用或设备'), findsOneWidget);
+  });
+
+  testWidgets('step 9: already_claimed at finish ends the flow', (tester) async {
+    await start(tester, unclaimed(claimedElsewhere: true));
+    await tester.claimAndReachNetwork();
+    await tester.enterNetwork('Harbour', 'harbour-wifi-1');
+    await tester.tapText('完成配网');
+    expect(find.text('设备已被其他方式认领'), findsOneWidget);
+  });
+
+  testWidgets('a drop on an unclaimed device: reconnect starts again from step 3', (tester) async {
+    final d = await start(tester, unclaimed());
+    await tester.claimAndReachNetwork();
+    // The device's notifications ride fake-async timers: pumped, not awaited.
+    unawaited(d.close('idle'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 分钟无操作，设备断开了蓝牙。 蓝牙已断开，暂存的管理员设置已丢弃。重新连接后从验证重新开始。'), findsOneWidget);
+    expect(d.staged, isNull);
+    await tester.tapText('重新连接');
+    expect(find.text('设置管理员'), findsOneWidget);
+  });
+
+  testWidgets('a drop on a claimed device asks to verify again', (tester) async {
+    final d = await start(tester, MockDevice(claimed: true, secret: 'harbour-pw-1'));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.type('管理员密码', 'harbour-pw-1');
+    await tester.tapText('验证');
+    // The device's notifications ride fake-async timers: pumped, not awaited.
+    unawaited(d.close());
+    await tester.pumpAndSettle();
+    expect(find.text('蓝牙已断开。重新连接并验证后继续。'), findsOneWidget);
+    await tester.tapText('重新连接');
+    expect(find.text('管理员密码'), findsOneWidget);
+  });
+
+  testWidgets('claimed elsewhere during the session', (tester) async {
+    final d = await start(tester, unclaimed());
+    await tester.claimAndReachNetwork();
+    // The device's notifications ride fake-async timers: pumped, not awaited.
+    unawaited(d.close('claimed_elsewhere'));
+    await tester.pumpAndSettle();
+    expect(find.text('设备已被其他方式认领'), findsOneWidget);
+  });
+
+  testWidgets('another phone holds the device', (tester) async {
+    await start(tester, MockDevice(busy: true));
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('已有其他手机连接该设备，请等对方完成后重试'), findsOneWidget);
+    expect(find.text('mica-a4e2e69e'), findsOneWidget);
+  });
+
+  testWidgets('Bluetooth off or missing', (tester) async {
+    await start(tester, MockDevice(), radio: RadioState.off);
+    expect(find.text('请打开蓝牙'), findsOneWidget);
+    await start(tester, MockDevice(), radio: RadioState.unsupported, lang: 'en');
+    expect(find.text('This phone has no Bluetooth Low Energy: set the device up through its hotspot'), findsOneWidget);
+  });
+
+  testWidgets('English, and the language switch', (tester) async {
+    await start(tester, unclaimed(), lang: 'en');
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('Set up the administrator'), findsOneWidget);
+    await tester.tapText('中文');
+    expect(find.text('设置管理员'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+  });
+
+  test('mergeNetworks keeps the strongest of a name and drops hidden ones', () {
+    expect(mergeNetworks(networks).map((n) => (n.ssid, n.signalDbm)), [('Harbour', -48), ('Marina Guest', -70)]);
+    expect(mergeNetworks('nope'), isEmpty);
+  });
+}

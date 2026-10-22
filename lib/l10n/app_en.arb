@@ -1,0 +1,148 @@
+{
+  "@@locale": "en",
+  "title": "mica Bluetooth setup",
+  "lead": "Send a mica device the site's Wi-Fi over Bluetooth, without joining the device's hotspot.",
+  "switchTo": "中文",
+  "radioUnsupported": "This phone has no Bluetooth Low Energy: set the device up through its hotspot",
+  "radioUnauthorized": "Allow the app to use Bluetooth in the phone's settings",
+  "radioOff": "Turn on Bluetooth",
+  "findHint": "Devices in setup are listed by hostname, such as mica-a4e2e69e. No Bluetooth pairing is needed.",
+  "findingDevices": "Looking for devices…",
+  "noDeviceHint": "A device is visible only while its setup window is open: for 10 minutes after it boots, or after setup is opened in the console.",
+  "connecting": "Connecting…",
+  "deviceBusy": "Another phone is connected to the device: try again once it has finished",
+  "device": "Device",
+  "model": "Model",
+  "hostname": "Hostname",
+  "claimed": "Claimed",
+  "unclaimed": "Unclaimed",
+  "protocolMismatch": "Update the app or the device",
+  "passwordUnavailable": "Log in to the console once to enable Bluetooth recovery",
+  "authPassword": "Administrator password",
+  "authTempCode": "Temporary setup code",
+  "authTempCodeHint": "The 8 digits under Bluetooth setup in the console",
+  "verify": "Verify",
+  "verifying": "Verifying…",
+  "wrongPassword": "Wrong password",
+  "wrongCode": "Wrong setup code",
+  "attemptsLeft": ", {n} attempts left",
+  "@attemptsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "locked": "Too many wrong attempts: the device is locked. Try again in {minutes} min",
+  "@locked": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "adminTitle": "Set up the administrator",
+  "adminHint": "The administrator password and hostname take effect when setup finishes.",
+  "adminPassword": "Administrator password (at least 8 characters)",
+  "adminPassword2": "Enter the password again",
+  "hostnameOptional": "Hostname (optional)",
+  "passwordTooShort": "The password needs at least 8 characters",
+  "passwordTooLong": "The password is too long",
+  "passwordMismatch": "The passwords do not match",
+  "hostnameInvalid": "A hostname is letters, digits and hyphens, at most 63, not starting or ending with a hyphen",
+  "next": "Next",
+  "statusTitle": "Current state",
+  "wifiMode": "Wi-Fi mode",
+  "modeClient": "Wi-Fi client",
+  "modeAp": "Wi-Fi access point",
+  "modeOff": "Off",
+  "connection": "Connection",
+  "connectedTo": "Connected to {ssid}",
+  "@connectedTo": {
+    "placeholders": {
+      "ssid": {}
+    }
+  },
+  "notConnected": "Not connected",
+  "ip": "IP",
+  "configureWifi": "Configure Wi-Fi",
+  "networkTitle": "Choose a network",
+  "scanning": "Scanning…",
+  "rescan": "Scan again",
+  "apNoScan": "The device is a Wi-Fi access point and cannot scan: enter the network name.",
+  "scanFailed": "The scan failed: scan again or enter the name",
+  "noNetworks": "No networks found",
+  "manual": "Enter a network name",
+  "ssid": "Network name",
+  "hidden": "Hidden network (does not broadcast its name)",
+  "open": "Open",
+  "ssidInvalid": "A network name is 1 to 32 bytes",
+  "passwordTitle": "Join {ssid}",
+  "@passwordTitle": {
+    "placeholders": {
+      "ssid": {}
+    }
+  },
+  "wifiPassword": "Wi-Fi password (empty for an open network)",
+  "pskInvalid": "A Wi-Fi password is 8 to 63 printable characters, or 64 hex digits",
+  "apWarning": "The device will turn off its hotspot and join {ssid}; anything connected to the hotspot will drop",
+  "@apWarning": {
+    "placeholders": {
+      "ssid": {}
+    }
+  },
+  "join": "Join",
+  "back": "Back",
+  "progress": "Joining {ssid}…",
+  "@progress": {
+    "placeholders": {
+      "ssid": {}
+    }
+  },
+  "success": "Connected to {ssid}, IP: {ip}",
+  "@success": {
+    "placeholders": {
+      "ssid": {},
+      "ip": {}
+    }
+  },
+  "finish": "Finish setup",
+  "finishing": "Finishing…",
+  "done": "Setup finished",
+  "doneText": "Make sure the phone is on {ssid}, then open http://{ip} (or http://{hostname}.local)",
+  "@doneText": {
+    "placeholders": {
+      "ssid": {},
+      "ip": {},
+      "hostname": {}
+    }
+  },
+  "openConsole": "Open the console",
+  "apPsk": "The device hotspot's new key",
+  "apPskOnce": "Shown only this once: note it now.",
+  "alreadyClaimed": "The device has been claimed another way",
+  "closingIdle": "Nothing happened for 2 minutes, so the device disconnected.",
+  "disconnectedUnclaimed": "Bluetooth disconnected and the staged administrator settings were dropped. Reconnect to start again from verification.",
+  "disconnectedClaimed": "Bluetooth disconnected. Reconnect and verify to continue.",
+  "reconnect": "Reconnect",
+  "restart": "Start again",
+  "commError": "Talking to the device failed: reconnect",
+  "resultWrongPassword": "Wrong Wi-Fi password",
+  "resultSsidNotFound": "Network not found: check the name or move closer to the router",
+  "resultDhcpTimeout": "Connected but got no IP address: check the router",
+  "resultUnsupportedSecurity": "The device does not support this network's security",
+  "resultBusy": "The device is busy: try again shortly",
+  "resultConnectFailed": "Could not connect: try again",
+  "resultInvalidSsid": "The network name is not valid",
+  "resultInvalidPsk": "The Wi-Fi password is not valid",
+  "resultNoRadio": "The device has no usable Wi-Fi",
+  "resultNotClaimed": "Set up the administrator first",
+  "resultInvalidPassword": "The administrator password is not valid (8 to 1024 bytes)",
+  "resultInvalidHostname": "The hostname is not valid",
+  "failed": "The operation failed: {reason}",
+  "@failed": {
+    "placeholders": {
+      "reason": {}
+    }
+  }
+}

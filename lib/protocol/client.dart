@@ -1,294 +1,354 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'framing.dart';
-import 'keys.dart';
-import 'spake2.dart';
+import 'crypto.dart';
+import 'fragments.dart';
 
-/// A byte pipe to the device: the GATT characteristics, or a fake in tests.
-abstract interface class Link {
-  Stream<List<int>> get incoming;
+// The phone's end of a protocol 1 session: info, authentication on `session`,
+// then encrypted operations on `command` and `event`.
 
-  /// The largest chunk [write] accepts.
-  int get chunkSize;
+const serviceUuid = 'a7f50001-aa05-4fbe-ae8a-39652ca94ed5';
+const infoUuid = 'a7f50002-aa05-4fbe-ae8a-39652ca94ed5';
+const sessionUuid = 'a7f50003-aa05-4fbe-ae8a-39652ca94ed5';
+const commandUuid = 'a7f50004-aa05-4fbe-ae8a-39652ca94ed5';
+const eventUuid = 'a7f50005-aa05-4fbe-ae8a-39652ca94ed5';
 
-  Future<void> write(Uint8List chunk);
+/// The protocol versions this app speaks.
+const supportedProtocols = [1];
 
-  Future<void> close();
+/// What the client needs from a connection; the tests stand in for it.
+/// The connection is already subscribed to `session` and `event`.
+abstract class Transport {
+  Future<Uint8List> readInfo();
+  Future<void> writeSession(Uint8List fragment);
+  Future<void> writeCommand(Uint8List fragment);
+  Stream<Uint8List> get sessionNotifications;
+  Stream<Uint8List> get eventNotifications;
+
+  /// Completes once when the link goes down, from either end.
+  Future<void> get disconnected;
+  Future<void> disconnect();
 }
 
-sealed class Credential {
-  const Credential();
+enum Auth { none, password, tempCode, passwordUnavailable }
+
+class DeviceInfo {
+  const DeviceInfo({
+    required this.protocol,
+    required this.model,
+    required this.hostname,
+    required this.claimed,
+    required this.auth,
+    required this.ops,
+    required this.maxWrite,
+  });
+
+  factory DeviceInfo.parse(List<int> raw) {
+    final Object? v;
+    try {
+      v = jsonDecode(utf8.decode(raw));
+    } on FormatException {
+      throw const ProtocolError('info is not JSON');
+    }
+    if (v is! Map<String, dynamic> || v['protocol'] is! int) throw const ProtocolError('info has no protocol');
+    final maxWrite = v['maxWrite'];
+    return DeviceInfo(
+      protocol: v['protocol'] as int,
+      model: v['model'] is String ? v['model'] as String : '',
+      hostname: v['hostname'] is String ? v['hostname'] as String : '',
+      claimed: v['claimed'] == true,
+      auth: switch (v['auth']) {
+        'none' => Auth.none,
+        'password' => Auth.password,
+        'temp-code' => Auth.tempCode,
+        _ => Auth.passwordUnavailable,
+      },
+      ops: v['ops'] is List ? (v['ops'] as List).whereType<String>().toList() : const [],
+      maxWrite: maxWrite is int ? maxWrite.clamp(20, 512) : 20,
+    );
+  }
+
+  final int protocol;
+  final String model;
+  final String hostname;
+  final bool claimed;
+  final Auth auth;
+  final List<String> ops;
+  final int maxWrite;
+
+  DeviceInfo copyWith({bool? claimed, String? hostname}) => DeviceInfo(
+    protocol: protocol,
+    model: model,
+    hostname: hostname ?? this.hostname,
+    claimed: claimed ?? this.claimed,
+    auth: auth,
+    ops: ops,
+    maxWrite: maxWrite,
+  );
 }
 
-final class PinCredential extends Credential {
-  const PinCredential(this.pin);
-  final String pin;
+/// An event from the device: `{"id":n,"event":"…",…}`.
+class DeviceEvent {
+  DeviceEvent(this.json);
+
+  final Map<String, dynamic> json;
+
+  int? get id => json['id'] is int ? json['id'] as int : null;
+  String get event => '${json['event']}';
+  String? get reason => json['reason'] is String ? json['reason'] as String : null;
+  bool get failed => event == 'failed';
+
+  Object? operator [](String member) => json[member];
 }
 
-final class PhoneCredential extends Credential {
-  const PhoneCredential(this.phone, this.secret);
-  final String phone;
-  final Uint8List secret;
-}
+/// The device answered `session` with `{"t":"error"}`, or the phone refused
+/// its confirmation (`auth_failed`).
+class SessionError implements Exception {
+  const SessionError(this.reason, {this.attemptsLeft, this.retryAfter});
 
-class ProtocolException implements Exception {
-  const ProtocolException(this.code, [this.message = '', this.retryAfter]);
-
-  final String code;
-  final String message;
-
-  /// Seconds to wait, for `backoff`.
+  final String reason;
+  final int? attemptsLeft;
   final int? retryAfter;
 
   @override
-  String toString() => 'ProtocolException($code${message.isEmpty ? '' : ': $message'})';
+  String toString() => 'session: $reason';
 }
 
-class DeviceHello {
-  const DeviceHello({required this.deviceId, required this.name, required this.pinSet});
+/// The connection dropped while the phone waited for the device.
+class DisconnectedError implements Exception {
+  const DisconnectedError();
 
-  final String deviceId;
-  final String name;
-  final bool pinSet;
+  @override
+  String toString() => 'disconnected';
 }
 
-class ApiResponse {
-  const ApiResponse(this.status, this.body);
+/// The device sent something protocol 1 does not allow.
+class ProtocolError implements Exception {
+  const ProtocolError(this.message);
 
-  final int status;
-  final Object? body;
+  final String message;
 
-  bool get ok => status >= 200 && status < 300;
-
-  /// The error code of a failed response, if it carries one.
-  String? get code => body is Map ? (body as Map)['code'] as String? : null;
+  @override
+  String toString() => 'protocol: $message';
 }
 
-const defaultTimeout = Duration(seconds: 20);
+/// w0 and w1 from the password; slow (PBKDF2), so the app runs it off the UI
+/// isolate.
+typedef Kdf = Future<({BigInt w0, BigInt w1})> Function(String pw, Uint8List salt, int iterations);
 
-/// Messages over a [Link]: framing on the way out, reassembly on the way in.
-class _Pipe {
-  _Pipe(this.link) {
-    _subscription = link.incoming.listen(_onChunk, onError: _fail, onDone: () => _fail(null));
+Future<({BigInt w0, BigInt w1})> _inline(String pw, Uint8List salt, int iterations) async =>
+    spakeScalars(pw, salt, iterations);
+
+class ProvisioningClient {
+  ProvisioningClient(this._t, {this.kdf = _inline}) {
+    _subs = [_t.sessionNotifications.listen(_sessionFragment), _t.eventNotifications.listen(_eventFragment)];
+    _t.disconnected.then((_) => _dropped());
   }
 
-  final Link link;
-  late final StreamSubscription<List<int>> _subscription;
-  final _deframer = Deframer();
-  final _queue = Queue<Uint8List>();
-  final _waiters = Queue<Completer<Uint8List>>();
-  Object? _closed;
+  final Transport _t;
+  final Kdf kdf;
+  late final List<StreamSubscription<Uint8List>> _subs;
 
-  void _onChunk(List<int> chunk) {
+  /// `{"event":"closing"}`: the device is about to disconnect on its own.
+  void Function(String reason) onClosing = (_) {};
+  void Function() onDisconnect = () {};
+
+  int _maxWrite = 20;
+  bool _closed = false;
+  final _sessionIn = Reassembler();
+  final _eventIn = Reassembler();
+  final _sessionQueue = <Map<String, dynamic>>[];
+  Completer<Map<String, dynamic>>? _sessionWaiter;
+  RecordCipher? _sealer, _opener;
+  int _nextId = 1;
+  ({int id, Completer<DeviceEvent> done, void Function(DeviceEvent)? onProgress})? _pending;
+
+  bool get connected => !_closed;
+  bool get authenticated => _sealer != null;
+
+  Future<DeviceInfo> readInfo() async {
+    final info = DeviceInfo.parse(await _t.readInfo());
+    _maxWrite = info.maxWrite;
+    return info;
+  }
+
+  /// `auth: none` (X25519).
+  Future<void> authenticateNone() async {
+    final x = X25519Start();
+    final ready = await _session({'t': 'start', 'auth': 'none', 'pub': base64.encode(x.pub)}, 'ready');
+    final SessionKeys keys;
     try {
-      for (final message in _deframer.add(chunk)) {
-        if (_waiters.isNotEmpty) {
-          _waiters.removeFirst().complete(message);
-        } else {
-          _queue.add(message);
-        }
-      }
-    } on FormatException catch (e) {
-      _fail(e);
+      keys = x.finish(_b64(ready['pub']));
+    } on FormatException {
+      throw const ProtocolError('bad device key');
     }
+    _ready(keys);
   }
 
-  void _fail(Object? error) {
-    _closed = error ?? const ProtocolException('closed', 'the device closed the connection');
-    while (_waiters.isNotEmpty) {
-      _waiters.removeFirst().completeError(_closed!);
+  /// `password` or `temp-code` (SPAKE2+). A wrong secret throws
+  /// [SessionError] `auth_failed` with the attempts left, if the device said.
+  /// A temp-code is used without its spaces and dashes; a password as typed.
+  Future<void> authenticateSpake(SpakeMode mode, String secret) async {
+    final pw = mode == SpakeMode.tempCode ? secret.replaceAll(RegExp(r'[\s-]'), '') : secret;
+    final params = await _session({'t': 'start', 'auth': mode.wire}, 'params');
+    final iterations = params['iterations'];
+    if (iterations is! int || iterations < 10000 || iterations > 10000000) {
+      throw const ProtocolError('iterations out of range');
     }
-  }
-
-  Future<Uint8List> next(Duration timeout) {
-    if (_queue.isNotEmpty) return Future.value(_queue.removeFirst());
-    if (_closed != null) return Future.error(_closed!);
-    final waiter = Completer<Uint8List>();
-    _waiters.add(waiter);
-    return waiter.future.timeout(timeout, onTimeout: () {
-      _waiters.remove(waiter);
-      throw const ProtocolException('timeout', 'the device did not answer');
-    });
-  }
-
-  Future<void> _sending = Future.value();
-
-  /// Send one message; messages go out whole and in call order.
-  Future<void> send(List<int> message) {
-    final framed = frame(message);
-    final done = _sending.then((_) async {
-      for (final chunk in chunks(framed, link.chunkSize)) {
-        await link.write(chunk);
-      }
-    });
-    _sending = done.catchError((_) {});
-    return done;
-  }
-
-  Future<void> close() async {
-    if (_closed == null) _fail(const ProtocolException('closed', 'the connection was closed'));
-    await _subscription.cancel();
-    await link.close();
-  }
-}
-
-Map<String, dynamic> _decode(Uint8List message) {
-  final value = jsonDecode(utf8.decode(message));
-  if (value is! Map<String, dynamic>) throw const ProtocolException('bad-request', 'not an object');
-  return value;
-}
-
-Uint8List _encode(Map<String, Object?> value) => utf8.encode(jsonEncode(value));
-
-/// A connection after hello, before authentication.
-class Connection {
-  Connection._(this._pipe, this.hello, this.timeout);
-
-  final _Pipe _pipe;
-  final DeviceHello hello;
-  final Duration timeout;
-
-  /// Say hello over [link].
-  static Future<Connection> open(Link link, {Duration timeout = defaultTimeout}) async {
-    final pipe = _Pipe(link);
+    final w = await kdf(pw, _b64(params['salt']), iterations);
+    final prover = SpakeProver(mode.context, w.w0, w.w1);
+    final share = await _session({'t': 'share', 'shareP': base64.encode(prover.shareP)}, 'share');
+    final attemptsLeft = share['attemptsLeft'] is int ? share['attemptsLeft'] as int : null;
+    final ({Uint8List confirmP, SpakeSchedule schedule}) done;
     try {
-      await pipe.send(_encode({'t': 'hello', 'v': protocolVersion}));
-      final answer = await _expect(pipe, 'hello', timeout);
-      if (answer['v'] != protocolVersion) {
-        throw const ProtocolException('bad-version', 'the device speaks another version');
-      }
-      return Connection._(
-        pipe,
-        DeviceHello(
-          deviceId: answer['device'] as String,
-          name: answer['name'] as String? ?? '',
-          pinSet: answer['pinSet'] as bool,
-        ),
-        timeout,
-      );
+      done = prover.finish(_b64(share['shareV']), _b64(share['confirmV']));
+    } on ConfirmationError {
+      // The device has counted the attempt; the phone sends nothing more.
+      throw SessionError('auth_failed', attemptsLeft: attemptsLeft);
+    } on FormatException {
+      throw const ProtocolError('bad device share');
+    }
+    await _session({'t': 'confirm', 'confirmP': base64.encode(done.confirmP)}, 'ready');
+    _ready(done.schedule.sessionKeys);
+  }
+
+  void _ready(SessionKeys keys) {
+    _sealer = RecordCipher(keys.phoneToDevice);
+    _opener = RecordCipher(keys.deviceToPhone);
+  }
+
+  /// Sends one operation; completes with its final event (`failed` included).
+  Future<DeviceEvent> run(
+    String op, [
+    Map<String, Object?> params = const {},
+    void Function(DeviceEvent)? onProgress,
+  ]) async {
+    final sealer = _sealer;
+    if (sealer == null) throw StateError('not authenticated');
+    if (_pending != null) throw StateError('an operation is running');
+    if (_closed) throw const DisconnectedError();
+    final id = _nextId++;
+    final pending = (id: id, done: Completer<DeviceEvent>(), onProgress: onProgress);
+    _pending = pending;
+    try {
+      await _write(_t.writeCommand, sealer.seal(utf8.encode(jsonEncode({'id': id, 'op': op, ...params}))));
     } catch (_) {
-      await pipe.close();
+      if (identical(_pending, pending)) _pending = null;
       rethrow;
     }
+    return pending.done.future;
   }
 
-  /// Run SPAKE2 with [credential]. Throws [ProtocolException]; after
-  /// `backoff` the connection may be authenticated again.
-  Future<Session> authenticate(Credential credential) async {
-    final (idA, secret) = switch (credential) {
-      PinCredential(:final pin) => ('pin', utf8.encode(pin)),
-      PhoneCredential(:final phone, :final secret) => ('phone:$phone', secret),
-    };
-    final spake = Spake2.a(
-      utf8.encode(idA),
-      utf8.encode(hello.deviceId),
-      passwordScalar(hello.deviceId, secret),
-    );
-    await _pipe.send(_encode({
-      't': 'auth',
-      ...switch (credential) {
-        PinCredential() => {'kind': 'pin'},
-        PhoneCredential(:final phone) => {'kind': 'phone', 'phone': phone},
-      },
-      'pA': base64.encode(spake.message),
-    }));
-    final answer = await _expect(_pipe, 'auth', timeout);
-    final keys = spake.finish(base64.decode(answer['pB'] as String), aad: utf8.encode(spakeAad));
-    await _pipe.send(_encode({'t': 'confirm', 'cA': base64.encode(keys.confirmation)}));
-    final confirm = await _expect(_pipe, 'confirm', timeout);
-    if (!keys.verify(base64.decode(confirm['cB'] as String))) {
-      await _pipe.close();
-      throw const ProtocolException('impostor', 'the device could not prove the secret');
-    }
-    final session = sessionKeys(keys.ke);
-    return Session._(
-      _pipe,
-      hello,
-      confirm['scope'] as String,
-      Sealer(session.phoneToDevice),
-      Sealer(session.deviceToPhone),
-      timeout,
-    );
-  }
+  Future<void> disconnect() => _t.disconnect();
 
-  Future<void> close() => _pipe.close();
-}
-
-Future<Map<String, dynamic>> _expect(_Pipe pipe, String type, Duration timeout) async {
-  final message = _decode(await pipe.next(timeout));
-  if (message['t'] == 'error') {
-    throw ProtocolException(
-      message['code'] as String? ?? 'error',
-      message['message'] as String? ?? '',
-      message['retryAfter'] as int?,
-    );
-  }
-  if (message['t'] != type) {
-    throw ProtocolException('bad-request', 'expected $type, got ${message['t']}');
-  }
-  return message;
-}
-
-/// An authenticated, sealed session.
-class Session {
-  Session._(this._pipe, this.hello, this._scope, this._out, this._in, this.timeout) {
-    unawaited(_receive());
-  }
-
-  final _Pipe _pipe;
-  final DeviceHello hello;
-  final Sealer _out, _in;
-  final Duration timeout;
-  final _pending = <int, Completer<ApiResponse>>{};
-  var _nextId = 1;
-  String _scope;
-  final _closed = Completer<Object>();
-
-  /// `full`, or `pin-change` while the device's PIN is unset.
-  String get scope => _scope;
-
-  /// Completes with the reason when the session ends.
-  Future<Object> get closed => _closed.future;
-
-  Future<void> _receive() async {
+  Uint8List _b64(Object? v) {
     try {
-      while (true) {
-        final message = _decode(_in.open(await _pipe.next(const Duration(days: 1))));
-        if (message['t'] != 'res') continue;
-        _pending.remove(message['id'])?.complete(ApiResponse(message['status'] as int, message['body']));
-      }
-    } catch (e) {
-      final reason = e is ProtocolException ? e : ProtocolException('closed', '$e');
-      for (final waiter in _pending.values) {
-        waiter.completeError(reason);
-      }
-      _pending.clear();
-      if (!_closed.isCompleted) _closed.complete(reason);
+      return base64.decode(v as String);
+    } catch (_) {
+      throw const ProtocolError('a binary member is not base64');
     }
   }
 
-  Future<ApiResponse> request(String method, String path, [Object? body]) async {
-    if (_closed.isCompleted) throw await _closed.future;
-    final id = _nextId++;
-    final waiter = Completer<ApiResponse>();
-    _pending[id] = waiter;
-    await _pipe.send(_out.seal(_encode({'t': 'req', 'id': id, 'method': method, 'path': path, 'body': ?body})));
-    final response = await waiter.future.timeout(timeout, onTimeout: () {
-      _pending.remove(id);
-      throw const ProtocolException('timeout', 'the device did not answer');
-    });
-    return response;
+  Future<void> _write(Future<void> Function(Uint8List) send, List<int> message) async {
+    for (final f in fragment(message, _maxWrite)) {
+      await send(f);
+    }
   }
 
-  /// Set the device's PIN; widens a `pin-change` session to `full`.
-  Future<ApiResponse> setPin(String pin) async {
-    final response = await request('PUT', '/ble/pin', {'pin': pin});
-    if (response.ok) _scope = 'full';
-    return response;
+  Future<Map<String, dynamic>> _session(Map<String, Object?> msg, String want) async {
+    if (_closed) throw const DisconnectedError();
+    _sessionQueue.clear();
+    await _write(_t.writeSession, utf8.encode(jsonEncode(msg)));
+    final Map<String, dynamic> reply;
+    if (_sessionQueue.isNotEmpty) {
+      reply = _sessionQueue.removeAt(0);
+    } else {
+      final waiter = _sessionWaiter = Completer();
+      reply = await waiter.future;
+    }
+    if (reply['t'] == 'error') {
+      int? n(Object? v) => v is int ? v : null;
+      throw SessionError(
+        '${reply['reason']}',
+        attemptsLeft: n(reply['attemptsLeft']),
+        retryAfter: n(reply['retryAfter']),
+      );
+    }
+    if (reply['t'] != want) throw ProtocolError('expected $want, got ${reply['t']}');
+    return reply;
   }
 
-  Future<void> close() => _pipe.close();
+  void _sessionFragment(Uint8List f) {
+    final Map<String, dynamic> msg;
+    try {
+      final whole = _sessionIn.push(f);
+      if (whole == null) return;
+      final v = jsonDecode(utf8.decode(whole));
+      if (v is! Map<String, dynamic> || v['t'] is! String) throw const FormatException('no t');
+      msg = v;
+    } on FormatException {
+      _sessionWaiter?.completeError(const ProtocolError('malformed session message'));
+      _sessionWaiter = null;
+      return;
+    }
+    final waiter = _sessionWaiter;
+    if (waiter != null) {
+      _sessionWaiter = null;
+      waiter.complete(msg);
+    } else {
+      _sessionQueue.add(msg);
+    }
+  }
+
+  void _eventFragment(Uint8List f) {
+    final DeviceEvent e;
+    try {
+      final whole = _eventIn.push(f);
+      if (whole == null) return;
+      final opener = _opener;
+      if (opener == null) throw const FormatException('event before the session is ready');
+      final v = jsonDecode(utf8.decode(opener.open(whole)));
+      if (v is! Map<String, dynamic>) throw const FormatException('event is not an object');
+      e = DeviceEvent(v);
+    } on FormatException catch (err) {
+      return _fatal(ProtocolError(err.message));
+    }
+    _dispatch(e);
+  }
+
+  void _dispatch(DeviceEvent e) {
+    if (e.id == null) {
+      if (e.event == 'closing') onClosing('${e['reason']}');
+      return;
+    }
+    final p = _pending;
+    if (p == null || e.id != p.id) return;
+    if (e.event == 'connecting') {
+      p.onProgress?.call(e);
+      return;
+    }
+    _pending = null;
+    p.done.complete(e);
+  }
+
+  void _fatal(Object err) {
+    _pending?.done.completeError(err);
+    _pending = null;
+    _t.disconnect();
+  }
+
+  void _dropped() {
+    if (_closed) return;
+    _closed = true;
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _sessionWaiter?.completeError(const DisconnectedError());
+    _sessionWaiter = null;
+    _sealer = _opener = null;
+    _pending?.done.completeError(const DisconnectedError());
+    _pending = null;
+    onDisconnect();
+  }
 }

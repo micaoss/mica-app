@@ -1,5 +1,5 @@
 name: mica_app
-description: "Set up the network of a Mica OS device over Bluetooth."
+description: "Set up a mica device's Wi-Fi over Bluetooth: micad's BLE provisioning protocol 1."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -12,9 +12,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_blue_plus: ^2.3.14
-  flutter_secure_storage: ^11.2.0
   intl: any
   pointycastle: ^4.0.0
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:
