@@ -1,7 +1,7 @@
 name: ci
 # Every push to main and pull request: analyze and test on Flutter 3.47.7
-# (the SDK tools/flutter.Dockerfile pins), and check that the test vectors are
-# still mica-core's. No store builds yet.
+# (the SDK tools/flutter.Dockerfile pins), check that the test vectors are
+# still mica-core's, and build a debug APK on main. No store builds yet.
 on:
   workflow_dispatch:
   push:
@@ -30,3 +30,27 @@ jobs:
         run: |
           curl -fsSL https://raw.githubusercontent.com/micaoss/mica-core/main/docs/ble-provisioning.md -o /tmp/ble-provisioning.md
           python3 -I tools/extract_vectors.py /tmp/ble-provisioning.md | diff -u test/protocol/vectors.json -
+  apk:
+    # A debug APK of every push to main, unsigned for release, as a workflow
+    # artifact: installable on an Android phone for device tests.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mica-app-debug-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error

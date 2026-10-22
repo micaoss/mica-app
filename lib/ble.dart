@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:universal_ble/universal_ble.dart';
 
 import 'protocol/client.dart';
 
@@ -9,14 +9,13 @@ enum RadioState { unsupported, unauthorized, off, on, unknown }
 
 /// A device that advertises the provisioning service.
 class FoundDevice {
-  const FoundDevice(this.id, this.name, this.rssi, [this.handle]);
+  const FoundDevice(this.id, this.name, this.rssi);
 
   final String id;
 
   /// The scan response's local name: the hostname.
   final String name;
   final int rssi;
-  final Object? handle;
 }
 
 /// The phone's Bluetooth, as the app uses it; the tests stand in for it.
@@ -31,51 +30,39 @@ abstract class Bluetooth {
   Future<Transport> connect(FoundDevice device);
 }
 
-final _service = Guid(serviceUuid);
-
-class FlutterBlueBluetooth implements Bluetooth {
+/// The phone's Bluetooth through universal_ble (BSD-3-Clause).
+class PlatformBluetooth implements Bluetooth {
   @override
   Stream<RadioState> get state async* {
-    if (!await FlutterBluePlus.isSupported) {
-      yield RadioState.unsupported;
-      return;
-    }
-    yield* FlutterBluePlus.adapterState.map(
-      (s) => switch (s) {
-        BluetoothAdapterState.on => RadioState.on,
-        BluetoothAdapterState.off ||
-        BluetoothAdapterState.turningOff ||
-        BluetoothAdapterState.turningOn => RadioState.off,
-        BluetoothAdapterState.unauthorized => RadioState.unauthorized,
-        BluetoothAdapterState.unavailable => RadioState.unsupported,
-        _ => RadioState.unknown,
-      },
-    );
+    yield _state(await UniversalBle.getBluetoothAvailabilityState());
+    yield* UniversalBle.availabilityStream.map(_state);
   }
+
+  static RadioState _state(AvailabilityState s) => switch (s) {
+    AvailabilityState.poweredOn => RadioState.on,
+    AvailabilityState.poweredOff || AvailabilityState.resetting => RadioState.off,
+    AvailabilityState.unauthorized => RadioState.unauthorized,
+    AvailabilityState.unsupported => RadioState.unsupported,
+    AvailabilityState.unknown => RadioState.unknown,
+  };
 
   @override
   Stream<List<FoundDevice>> scan() {
-    late StreamSubscription<List<ScanResult>> sub;
+    final seen = <String, FoundDevice>{};
+    late StreamSubscription<BleDevice> sub;
     late StreamController<List<FoundDevice>> out;
     out = StreamController(
       onListen: () {
-        sub = FlutterBluePlus.onScanResults.listen((results) {
-          final list = [
-            for (final r in results)
-              FoundDevice(
-                r.device.remoteId.str,
-                r.advertisementData.advName.isNotEmpty ? r.advertisementData.advName : r.device.platformName,
-                r.rssi,
-                r.device,
-              ),
-          ]..sort((a, b) => b.rssi.compareTo(a.rssi));
-          out.add(list);
+        sub = UniversalBle.scanStream.listen((d) {
+          seen[d.deviceId] = FoundDevice(d.deviceId, d.name ?? '', d.rssi ?? -127);
+          out.add(seen.values.toList()..sort((a, b) => b.rssi.compareTo(a.rssi)));
         }, onError: out.addError);
-        FlutterBluePlus.startScan(withServices: [_service]).catchError(out.addError);
+        // Asks for the Bluetooth permissions first where the platform has them.
+        UniversalBle.startScan(scanFilter: ScanFilter(withServices: [serviceUuid])).catchError(out.addError);
       },
       onCancel: () async {
         await sub.cancel();
-        await FlutterBluePlus.stopScan();
+        await UniversalBle.stopScan();
       },
     );
     return out.stream;
@@ -83,60 +70,59 @@ class FlutterBlueBluetooth implements Bluetooth {
 
   @override
   Future<Transport> connect(FoundDevice found) async {
-    final device = found.handle! as BluetoothDevice;
-    await device.connect(license: License.nonprofit, autoConnect: false);
+    final id = found.id;
+    await UniversalBle.connect(id);
     try {
-      final service = (await device.discoverServices()).firstWhere((s) => s.uuid == _service);
-      BluetoothCharacteristic ch(String uuid) => service.characteristics.firstWhere((c) => c.uuid == Guid(uuid));
-      final t = _BlueTransport(device, ch(infoUuid), ch(sessionUuid), ch(commandUuid), ch(eventUuid));
-      await t._subscribe();
+      // Android starts at the 23-byte default; info.maxWrite follows what this
+      // negotiates. iOS negotiates by itself.
+      try {
+        await UniversalBle.requestMtu(id, 517);
+      } catch (_) {}
+      await UniversalBle.discoverServices(id);
+      final t = _UniversalTransport(id);
+      // Subscribed before the first write, as the protocol asks.
+      await UniversalBle.subscribeNotifications(id, serviceUuid, sessionUuid);
+      await UniversalBle.subscribeNotifications(id, serviceUuid, eventUuid);
       return t;
     } catch (_) {
-      await device.disconnect();
+      await UniversalBle.disconnect(id);
       rethrow;
     }
   }
 }
 
-class _BlueTransport implements Transport {
-  _BlueTransport(this._device, this._info, this._session, this._command, this._event) {
-    _stateSub = _device.connectionState.listen((s) {
-      if (s == BluetoothConnectionState.disconnected && !_gone.isCompleted) {
+class _UniversalTransport implements Transport {
+  _UniversalTransport(this._id) {
+    _connection = UniversalBle.connectionStream(_id).listen((up) {
+      if (!up && !_gone.isCompleted) {
         _gone.complete();
-        _stateSub.cancel();
+        _connection.cancel();
       }
     });
   }
 
-  final BluetoothDevice _device;
-  final BluetoothCharacteristic _info, _session, _command, _event;
+  final String _id;
   final _gone = Completer<void>();
-  late final StreamSubscription<BluetoothConnectionState> _stateSub;
-
-  // Subscribed before the first write, as the protocol asks.
-  Future<void> _subscribe() async {
-    await _session.setNotifyValue(true);
-    await _event.setNotifyValue(true);
-  }
+  late final StreamSubscription<bool> _connection;
 
   @override
-  Future<Uint8List> readInfo() async => Uint8List.fromList(await _info.read());
+  Future<Uint8List> readInfo() => UniversalBle.read(_id, serviceUuid, infoUuid);
 
   @override
-  Future<void> writeSession(Uint8List fragment) => _session.write(fragment);
+  Future<void> writeSession(Uint8List fragment) => UniversalBle.write(_id, serviceUuid, sessionUuid, fragment);
 
   @override
-  Future<void> writeCommand(Uint8List fragment) => _command.write(fragment);
+  Future<void> writeCommand(Uint8List fragment) => UniversalBle.write(_id, serviceUuid, commandUuid, fragment);
 
   @override
-  Stream<Uint8List> get sessionNotifications => _session.onValueReceived.map(Uint8List.fromList);
+  Stream<Uint8List> get sessionNotifications => UniversalBle.characteristicValueStream(_id, sessionUuid);
 
   @override
-  Stream<Uint8List> get eventNotifications => _event.onValueReceived.map(Uint8List.fromList);
+  Stream<Uint8List> get eventNotifications => UniversalBle.characteristicValueStream(_id, eventUuid);
 
   @override
   Future<void> get disconnected => _gone.future;
 
   @override
-  Future<void> disconnect() => _device.disconnect();
+  Future<void> disconnect() => UniversalBle.disconnect(_id);
 }

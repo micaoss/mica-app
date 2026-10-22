@@ -10,7 +10,7 @@ import 'protocol/crypto.dart';
 import 'setup_page.dart';
 
 void main() {
-  runApp(MicaApp(radio: FlutterBlueBluetooth(), kdf: _isolateKdf));
+  runApp(MicaApp(radio: PlatformBluetooth(), kdf: _isolateKdf));
 }
 
 // PBKDF2 at the device's iteration count takes seconds: off the UI isolate.

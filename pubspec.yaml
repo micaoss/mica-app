@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  flutter_blue_plus: ^2.3.14
+  universal_ble: ^3.1.2
   intl: any
   pointycastle: ^4.0.0
   url_launcher: ^6.3.3
