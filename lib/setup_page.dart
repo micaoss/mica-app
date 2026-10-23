@@ -448,7 +448,10 @@ class _SetupPageState extends State<SetupPage> {
         final host = '${e['hostname']}';
         final r = e['interface'];
         final urls = e['consoleUrls'] is List
-            ? (e['consoleUrls'] as List).whereType<String>().where((u) => u.startsWith('http://')).toList()
+            ? (e['consoleUrls'] as List)
+                  .whereType<String>()
+                  .where((u) => u.startsWith('http://') || u.startsWith('https://'))
+                  .toList()
             : [if (joined.ip != null) 'http://${joined.ip}', 'http://$host.local'];
         // Set before the device disconnects, which follows `finished` at once.
         _step = DoneStep(
@@ -1166,7 +1169,7 @@ class DoneView extends StatelessWidget {
           ),
         if (!step.claimed) ...[const SizedBox(height: 8), Text(t.doneClaim)],
         const SizedBox(height: 12),
-        Text(t.consoleAt),
+        Text(step.urls.isEmpty ? t.consoleOffNetwork : t.consoleAt),
         for (final u in step.urls)
           Padding(
             padding: const EdgeInsets.only(top: 8),

@@ -758,6 +758,12 @@ abstract class AppLocalizations {
   /// **'Open the console:'**
   String get consoleAt;
 
+  /// No description provided for @consoleOffNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'The console on this device is not reachable over the network, so it cannot be opened from here.'**
+  String get consoleOffNetwork;
+
   /// No description provided for @doneClaim.
   ///
   /// In en, this message translates to:

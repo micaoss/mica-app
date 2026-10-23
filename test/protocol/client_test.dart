@@ -80,7 +80,7 @@ void main() {
       'claimed': false,
       'hostname': 'mica-a4e2e69e',
       'interface': {'name': 'wlan0', 'kind': 'wifi', 'address': '192.168.8.41/24'},
-      'consoleUrls': ['http://192.168.8.41', 'http://mica-a4e2e69e.local'],
+      'consoleUrls': ['http://192.168.8.41:8080', 'http://mica-a4e2e69e.local:8080'],
       'ap': 'off',
     });
     await pumpEventQueue();
@@ -108,7 +108,23 @@ void main() {
     expect((await c.run('setNetwork', {'interface': 'wlan0', 'dhcp': true})).reason, 'unknown_interface');
     final f = await c.run('finish');
     expect(f['ap'], 'on');
-    expect(f['consoleUrls'], ['http://192.168.8.50', 'http://mica-a4e2e69e.local']);
+    expect(f['consoleUrls'], ['http://192.168.8.50:8080', 'http://mica-a4e2e69e.local:8080']);
+  });
+
+  test('consoleUrls follow access.web: https on 443 drops the port, IPv6 is bracketed, local is empty', () async {
+    Future<Object?> urls(MockDevice d) async {
+      final c = ProvisioningClient(d.connect());
+      await c.readInfo();
+      await c.authenticateNone();
+      await c.run('setNetwork', {'interface': 'end0', 'dhcp': true});
+      return (await c.run('finish'))['consoleUrls'];
+    }
+
+    expect(await urls(MockDevice(https: true, leaseAddress: 'fd00::50/64')), [
+      'https://[fd00::50]',
+      'https://mica-a4e2e69e.local',
+    ]);
+    expect(await urls(MockDevice(webMode: 'local')), isEmpty);
   });
 
   test('a 0.0.3 device (claim in ops) still claims and generates the AP key', () async {

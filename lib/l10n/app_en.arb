@@ -173,6 +173,7 @@
     }
   },
   "consoleAt": "Open the console:",
+  "consoleOffNetwork": "The console on this device is not reachable over the network, so it cannot be opened from here.",
   "doneClaim": "Open the console to set the administrator password. The console asks for the device code on the label.",
   "hotspotOn": "The device's hotspot is still on, with the key on its label.",
   "resultBadRequest": "The request was malformed",

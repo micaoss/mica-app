@@ -365,6 +365,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get consoleAt => '打开控制台：';
 
   @override
+  String get consoleOffNetwork => '此设备的控制台未对网络开放，无法从这里打开。';
+
+  @override
   String get doneClaim => '打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。';
 
   @override

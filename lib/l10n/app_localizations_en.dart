@@ -370,6 +370,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get consoleAt => 'Open the console:';
 
   @override
+  String get consoleOffNetwork =>
+      'The console on this device is not reachable over the network, so it cannot be opened from here.';
+
+  @override
   String get doneClaim =>
       'Open the console to set the administrator password. The console asks for the device code on the label.';
 

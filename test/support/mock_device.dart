@@ -67,6 +67,10 @@ class MockDevice {
     this.echoStatus = true,
     this.wiredFail,
     this.leaseAddress = '192.168.8.50/24',
+    this.webMode = 'lan',
+    this.https = false,
+    this.httpPort = 8080,
+    this.httpsPort = 443,
     this.generatedApPsk = 'harbour-ap-key-7f3a',
     this.connectDelay = const Duration(milliseconds: 5),
   }) : _hostname0 = hostname,
@@ -103,6 +107,16 @@ class MockDevice {
   /// A `setNetwork` failure reason to answer instead of bringing the port up.
   final String? wiredFail;
   final String leaseAddress;
+
+  /// `access.web`: `local` and `off` keep the console off the network.
+  final String webMode;
+  final bool https;
+  final int httpPort, httpsPort;
+
+  String _console(String host) {
+    final (scheme, port, own) = https ? ('https', httpsPort, 443) : ('http', httpPort, 80);
+    return '$scheme://$host${port == own ? '' : ':$port'}';
+  }
 
   /// Legacy (`claim` in ops): the key generated at `finish` when the claim gave none.
   final String generatedApPsk;
@@ -412,7 +426,12 @@ class MockDevice {
       'claimed': claimed,
       'hostname': hostname,
       'interface': port == null ? null : {'name': port.name, 'kind': port.kind, 'address': port.address},
-      'consoleUrls': [if (address != null) 'http://$address', 'http://$hostname.local'],
+      'consoleUrls': [
+        if (webMode != 'local' && webMode != 'off') ...[
+          if (address != null) _console(address.contains(':') ? '[$address]' : address),
+          _console('$hostname.local'),
+        ],
+      ],
       'ap': wifi.mode == 'ap' ? 'on' : 'off',
     });
     return close();

@@ -111,6 +111,7 @@
   "wiredUp": "{name} 已配置，地址：{address}",
   "doneConnected": "已连接。{kind} {address}。",
   "consoleAt": "打开控制台：",
+  "consoleOffNetwork": "此设备的控制台未对网络开放，无法从这里打开。",
   "doneClaim": "打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。",
   "hotspotOn": "设备热点仍开启，密码见设备标签。",
   "resultBadRequest": "请求格式错误",

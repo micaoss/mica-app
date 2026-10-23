@@ -126,8 +126,9 @@ void main() {
     await tester.tapText('完成配网');
     expect(find.text('配网完成'), findsOneWidget);
     expect(find.text('已连接。Wi-Fi 192.168.8.41。'), findsOneWidget);
-    expect(find.text('http://192.168.8.41'), findsOneWidget);
-    expect(find.text('http://mica-a4e2e69e.local'), findsOneWidget);
+    expect(find.text('http://192.168.8.41:8080'), findsOneWidget);
+    expect(find.text('http://mica-a4e2e69e.local:8080'), findsOneWidget);
+    expect(find.text('此设备的控制台未对网络开放，无法从这里打开。'), findsNothing);
     expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。'), findsOneWidget);
     expect(find.text('设备热点仍开启，密码见设备标签。'), findsNothing);
     expect(find.text('设备热点的新密码'), findsNothing);
@@ -135,6 +136,24 @@ void main() {
     expect(d.hostname, 'mica-a4e2e69e');
     expect(d.commands.map((c) => c['op']), ['getStatus', 'setWifi', 'finish']);
     expect(d.commands.last, {'id': 3, 'op': 'finish'});
+  });
+
+  testWidgets('https console URLs are offered; an empty list says the console is not on the network', (tester) async {
+    await start(tester, MockDevice(routers: routers, https: true));
+    await tester.reachWifiNetwork();
+    await tester.enterNetwork('Harbour', 'harbour-wifi-1');
+    await tester.tapText('完成配网');
+    expect(find.text('https://192.168.8.41'), findsOneWidget);
+    expect(find.text('https://mica-a4e2e69e.local'), findsOneWidget);
+
+    await start(tester, MockDevice(routers: routers, webMode: 'off'));
+    await tester.reachWifiNetwork();
+    await tester.enterNetwork('Harbour', 'harbour-wifi-1');
+    await tester.tapText('完成配网');
+    expect(find.text('配网完成'), findsOneWidget);
+    expect(find.text('此设备的控制台未对网络开放，无法从这里打开。'), findsOneWidget);
+    expect(find.text('打开控制台：'), findsNothing);
+    expect(find.byType(OutlinedButton), findsNothing);
   });
 
   testWidgets('unclaimed, wired DHCP: the hotspot stays on with its label key', (tester) async {
@@ -147,7 +166,7 @@ void main() {
     expect(find.text('end0 已配置，地址：192.168.8.50/24'), findsOneWidget);
     await tester.tapText('完成配网');
     expect(find.text('已连接。有线 192.168.8.50。'), findsOneWidget);
-    expect(find.text('http://192.168.8.50'), findsOneWidget);
+    expect(find.text('http://192.168.8.50:8080'), findsOneWidget);
     expect(find.text('设备热点仍开启，密码见设备标签。'), findsOneWidget);
     expect(
       [
