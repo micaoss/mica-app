@@ -398,7 +398,6 @@ class MockDevice {
       });
       return close();
     }
-    if (c.keys.any((k) => k != 'id' && k != 'op')) return failed('bad_request');
     if (_auth == 'none' && claimedElsewhere) return failed('already_claimed');
     final port =
         _broughtUp ??

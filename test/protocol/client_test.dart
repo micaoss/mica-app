@@ -89,6 +89,15 @@ void main() {
     expect(d.largestWrite, inInclusiveRange(21, 40));
   });
 
+  test('finish ignores members it does not know; the hostname stays', () async {
+    final (d, c) = await open(MockDevice());
+    await c.authenticateNone();
+    final f = await c.run('finish', {'hostname': 'quay-7'});
+    expect(f.event, 'finished');
+    expect(f['hostname'], 'mica-a4e2e69e');
+    expect(d.hostname, 'mica-a4e2e69e');
+  });
+
   test('setNetwork: applying is progress, up is final', () async {
     final (_, c) = await open(MockDevice());
     await c.authenticateNone();
