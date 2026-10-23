@@ -368,10 +368,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get consoleOffNetwork => '此设备的控制台未对网络开放，无法从这里打开。';
 
   @override
-  String get doneClaim => '打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。';
+  String get doneClaim => '打开控制台设置管理员密码。控制台会要求输入设备码——它印在设备标签上，也显示在设备自身的控制台上（串口 / 显示器登录提示）。';
 
   @override
-  String get hotspotOn => '设备热点仍开启，密码见设备标签。';
+  String get hotspotOn => '设备热点仍开启，在控制台设置你自己的密码之前，热点密码为设备标签上的密码。';
 
   @override
   String get resultBadRequest => '请求格式错误';

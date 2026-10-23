@@ -375,10 +375,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get doneClaim =>
-      'Open the console to set the administrator password. The console asks for the device code on the label.';
+      'Open the console to set the administrator password. The console asks for the device code — it is printed on the device\'s label and shown on the device\'s own console (serial / display login prompt).';
 
   @override
-  String get hotspotOn => 'The device\'s hotspot is still on, with the key on its label.';
+  String get hotspotOn =>
+      'The device\'s hotspot is still on. It keeps the key on its label until you set your own in the console.';
 
   @override
   String get resultBadRequest => 'The request was malformed';

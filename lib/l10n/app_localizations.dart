@@ -767,13 +767,13 @@ abstract class AppLocalizations {
   /// No description provided for @doneClaim.
   ///
   /// In en, this message translates to:
-  /// **'Open the console to set the administrator password. The console asks for the device code on the label.'**
+  /// **'Open the console to set the administrator password. The console asks for the device code — it is printed on the device\'s label and shown on the device\'s own console (serial / display login prompt).'**
   String get doneClaim;
 
   /// No description provided for @hotspotOn.
   ///
   /// In en, this message translates to:
-  /// **'The device\'s hotspot is still on, with the key on its label.'**
+  /// **'The device\'s hotspot is still on. It keeps the key on its label until you set your own in the console.'**
   String get hotspotOn;
 
   /// No description provided for @resultBadRequest.

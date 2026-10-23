@@ -129,8 +129,8 @@ void main() {
     expect(find.text('http://192.168.8.41:8080'), findsOneWidget);
     expect(find.text('http://mica-a4e2e69e.local:8080'), findsOneWidget);
     expect(find.text('此设备的控制台未对网络开放，无法从这里打开。'), findsNothing);
-    expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。'), findsOneWidget);
-    expect(find.text('设备热点仍开启，密码见设备标签。'), findsNothing);
+    expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备码——它印在设备标签上，也显示在设备自身的控制台上（串口 / 显示器登录提示）。'), findsOneWidget);
+    expect(find.text('设备热点仍开启，在控制台设置你自己的密码之前，热点密码为设备标签上的密码。'), findsNothing);
     expect(find.text('设备热点的新密码'), findsNothing);
     expect(d.claimed, isFalse);
     expect(d.hostname, 'mica-a4e2e69e');
@@ -167,7 +167,7 @@ void main() {
     await tester.tapText('完成配网');
     expect(find.text('已连接。有线 192.168.8.50。'), findsOneWidget);
     expect(find.text('http://192.168.8.50:8080'), findsOneWidget);
-    expect(find.text('设备热点仍开启，密码见设备标签。'), findsOneWidget);
+    expect(find.text('设备热点仍开启，在控制台设置你自己的密码之前，热点密码为设备标签上的密码。'), findsOneWidget);
     expect(
       [
         for (final c in d.commands) {...c}..remove('id'),
@@ -270,7 +270,7 @@ void main() {
     expect(find.text('http://quay-7.local'), findsOneWidget);
     expect(find.text('harbour-ap-key-7f3a'), findsOneWidget);
     expect(find.text('只显示这一次，请现在记下。'), findsOneWidget);
-    expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。'), findsNothing);
+    expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备码——它印在设备标签上，也显示在设备自身的控制台上（串口 / 显示器登录提示）。'), findsNothing);
     expect(d.claimed, isTrue);
     expect(d.commands.firstWhere((c) => c['op'] == 'claim'), {
       'id': 1,
@@ -340,7 +340,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tapText('完成配网');
     expect(find.text('已连接。Wi-Fi 192.168.8.41。'), findsOneWidget);
-    expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备标签上的设备码。'), findsNothing);
+    expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备码——它印在设备标签上，也显示在设备自身的控制台上（串口 / 显示器登录提示）。'), findsNothing);
     expect(d.sessionLog.where((m) => m['t'] == 'start').length, 2);
   });
 
