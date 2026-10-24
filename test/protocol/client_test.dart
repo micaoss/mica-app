@@ -39,6 +39,7 @@ void main() {
     expect(status!.event, 'status');
     expect(status.id, isNull);
     expect(status['wifiMode'], 'ap');
+    expect(status['ap'], {'on': true, 'ssid': 'mica-a4e2e69e', 'psk': 'label-key-2f9c'});
     expect((status['interfaces'] as List).first, {
       'name': 'end0',
       'kind': 'ethernet',
@@ -81,7 +82,7 @@ void main() {
       'hostname': 'mica-a4e2e69e',
       'interface': {'name': 'wlan0', 'kind': 'wifi', 'address': '192.168.8.41/24'},
       'consoleUrls': ['http://192.168.8.41:8080', 'http://mica-a4e2e69e.local:8080'],
-      'ap': 'off',
+      'ap': {'on': false},
     });
     await pumpEventQueue();
     expect(dropped, isTrue);
@@ -107,7 +108,7 @@ void main() {
     expect(e.json, {'id': 1, 'event': 'up', 'interface': 'end0', 'address': '192.168.8.50/24'});
     expect((await c.run('setNetwork', {'interface': 'wlan0', 'dhcp': true})).reason, 'unknown_interface');
     final f = await c.run('finish');
-    expect(f['ap'], 'on');
+    expect(f['ap'], {'on': true, 'ssid': 'mica-a4e2e69e', 'psk': 'label-key-2f9c'});
     expect(f['consoleUrls'], ['http://192.168.8.50:8080', 'http://mica-a4e2e69e.local:8080']);
   });
 

@@ -752,6 +752,60 @@ abstract class AppLocalizations {
   /// **'Connected. {kind} {address}.'**
   String doneConnected(Object kind, Object address);
 
+  /// No description provided for @hotspotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join the device\'s hotspot'**
+  String get hotspotTitle;
+
+  /// No description provided for @hotspotSsid.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get hotspotSsid;
+
+  /// No description provided for @hotspotKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Key'**
+  String get hotspotKey;
+
+  /// No description provided for @copySsid.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the network name'**
+  String get copySsid;
+
+  /// No description provided for @copyKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the key'**
+  String get copyKey;
+
+  /// No description provided for @hotspotQr.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code to join the device\'s hotspot'**
+  String get hotspotQr;
+
+  /// No description provided for @joinHotspot.
+  ///
+  /// In en, this message translates to:
+  /// **'Join the hotspot'**
+  String get joinHotspot;
+
+  /// No description provided for @hotspotJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'The phone was asked to join the device\'s hotspot.'**
+  String get hotspotJoined;
+
+  /// No description provided for @hotspotJoinFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not join automatically. Scan the QR code or join in the phone\'s Wi-Fi settings.'**
+  String get hotspotJoinFailed;
+
   /// No description provided for @consoleAt.
   ///
   /// In en, this message translates to:

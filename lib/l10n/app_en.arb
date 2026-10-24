@@ -172,6 +172,15 @@
       "address": {}
     }
   },
+  "hotspotTitle": "Join the device's hotspot",
+  "hotspotSsid": "Network",
+  "hotspotKey": "Key",
+  "copySsid": "Copy the network name",
+  "copyKey": "Copy the key",
+  "hotspotQr": "QR code to join the device's hotspot",
+  "joinHotspot": "Join the hotspot",
+  "hotspotJoined": "The phone was asked to join the device's hotspot.",
+  "hotspotJoinFailed": "Could not join automatically. Scan the QR code or join in the phone's Wi-Fi settings.",
   "consoleAt": "Open the console:",
   "consoleOffNetwork": "The console on this device is not reachable over the network, so it cannot be opened from here.",
   "doneClaim": "Open the console to set the administrator password. The console asks for the device code — it is printed on the device's label and shown on the device's own console (serial / display login prompt).",

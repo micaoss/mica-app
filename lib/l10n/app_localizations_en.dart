@@ -367,6 +367,34 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get hotspotTitle => 'Join the device\'s hotspot';
+
+  @override
+  String get hotspotSsid => 'Network';
+
+  @override
+  String get hotspotKey => 'Key';
+
+  @override
+  String get copySsid => 'Copy the network name';
+
+  @override
+  String get copyKey => 'Copy the key';
+
+  @override
+  String get hotspotQr => 'QR code to join the device\'s hotspot';
+
+  @override
+  String get joinHotspot => 'Join the hotspot';
+
+  @override
+  String get hotspotJoined => 'The phone was asked to join the device\'s hotspot.';
+
+  @override
+  String get hotspotJoinFailed =>
+      'Could not join automatically. Scan the QR code or join in the phone\'s Wi-Fi settings.';
+
+  @override
   String get consoleAt => 'Open the console:';
 
   @override

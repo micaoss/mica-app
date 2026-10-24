@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ble.dart';
 import 'l10n/app_localizations.dart';
 import 'protocol/client.dart';
 import 'protocol/crypto.dart';
+import 'wifi.dart';
 
 // The phone's provisioning flow, mica-network-spec chapter 5 section 3: step 1
 // (find and connect) to step 9 (finish); step 10 is the console on the
@@ -26,8 +28,37 @@ class Port {
   final String? address;
 }
 
+/// The device's hotspot while it is on and on the label key, which the
+/// device sends only while it is unclaimed.
+class Hotspot {
+  const Hotspot(this.ssid, this.psk);
+
+  /// `ap` from `status` or `finished`; the older `on`/`off` string has no key.
+  static Hotspot? of(Object? ap) => ap is Map && ap['on'] == true && ap['ssid'] is String && ap['psk'] is String
+      ? Hotspot(ap['ssid'] as String, ap['psk'] as String)
+      : null;
+
+  final String ssid, psk;
+
+  /// The Wi-Fi QR code phone cameras join from.
+  String get qr => 'WIFI:T:WPA;S:${_escape(ssid)};P:${_escape(psk)};;';
+
+  static String _escape(String s) => s.replaceAllMapped(RegExp(r'[\\;,:"]'), (m) => '\\${m[0]}');
+}
+
+/// The console on the hotspot's address, at the scheme and port of the first
+/// console URL, while the device's Wi-Fi is its access point.
+Uri? hotspotConsole(Status? status, List<String> urls) {
+  final address = status?.interfaces.where((p) => p.kind == 'wifi' && p.address != null).firstOrNull?.address;
+  if (status?.wifiMode != 'ap' || address == null || urls.isEmpty) return null;
+  return Uri.parse(urls.first).replace(host: address.split('/').first);
+}
+
+/// `ap` in either shape: `{on, ssid, psk}` or the older `on`/`off`.
+bool apOn(Object? ap) => ap == 'on' || (ap is Map && ap['on'] == true);
+
 class Status {
-  const Status(this.wifiMode, this.connected, this.ssid, this.ip, this.interfaces);
+  const Status(this.wifiMode, this.connected, this.ssid, this.ip, this.interfaces, [this.hotspot]);
 
   /// A `status` event: getStatus's answer, or the one that follows `ready`.
   factory Status.of(DeviceEvent e) => Status(
@@ -45,12 +76,14 @@ class Status {
             p['address'] is String ? p['address'] as String : null,
           ),
     ],
+    Hotspot.of(e['ap']),
   );
 
   final String wifiMode;
   final bool connected;
   final String? ssid, ip;
   final List<Port> interfaces;
+  final Hotspot? hotspot;
 
   List<Port> get ethernet => interfaces.where((p) => p.kind == 'ethernet').toList();
 }
@@ -165,12 +198,20 @@ class JoinedStep extends Step {
 }
 
 class DoneStep extends Step {
-  const DoneStep({required this.reached, required this.urls, required this.claimed, required this.apOn, this.apPsk});
+  const DoneStep({
+    required this.reached,
+    required this.urls,
+    required this.claimed,
+    required this.apOn,
+    this.hotspot,
+    this.apPsk,
+  });
 
   /// `{kind, address}` of the port the session brought up.
   final (String, String?)? reached;
   final List<String> urls;
   final bool claimed, apOn;
+  final Hotspot? hotspot;
 
   /// A 0.0.3 device's generated access-point key, shown once.
   final String? apPsk;
@@ -181,10 +222,21 @@ final _pskPattern = RegExp(r'^(?:[\x20-\x7E]{8,63}|[0-9a-fA-F]{64})$');
 int _bytes(String s) => utf8.encode(s).length;
 
 class SetupPage extends StatefulWidget {
-  const SetupPage({super.key, required this.radio, required this.kdf, required this.onSwitchLanguage});
+  const SetupPage({
+    super.key,
+    required this.radio,
+    required this.kdf,
+    required this.wifi,
+    required this.open,
+    required this.onSwitchLanguage,
+  });
 
   final Bluetooth radio;
   final Kdf kdf;
+  final Wifi wifi;
+
+  /// Opens a console URL in the phone's browser.
+  final Future<void> Function(Uri url) open;
   final VoidCallback onSwitchLanguage;
 
   @override
@@ -402,7 +454,7 @@ class _SetupPageState extends State<SetupPage> {
     _go(BusyStep(t.progress(ssid)));
     try {
       final e = await _client!.run('setWifi', {'ssid': ssid, 'psk': psk, 'hidden': hidden});
-      if (e.event == 'connected') return _go(JoinedStep(t.success(ssid, '${e['ip']}'), '${e['ip']}'));
+      if (e.event == 'connected') return await _joined(JoinedStep(t.success(ssid, '${e['ip']}'), '${e['ip']}'));
       switch (e.reason) {
         case 'ssid_not_found' || 'unsupported_security' || 'invalid_ssid' || 'no_radio':
           return await _chooseNetwork(_reason(e));
@@ -432,13 +484,18 @@ class _SetupPageState extends State<SetupPage> {
     };
     try {
       final e = await _client!.run('setNetwork', params);
-      if (e.event == 'up') return _go(JoinedStep(t.wiredUp('${e['interface']}', '${e['address'] ?? '—'}')));
+      if (e.event == 'up') return await _joined(JoinedStep(t.wiredUp('${e['interface']}', '${e['address'] ?? '—'}')));
       if (e.reason == 'already_claimed') return _stop(t.alreadyClaimed);
       _go(WiredStep(status, form), e.reason == 'dhcp_timeout' ? t.resultWiredDhcpTimeout : _reason(e));
     } catch (e) {
       _broken(e);
     }
   }
+
+  /// The network is up: `finish` goes out at once, so leaving now cannot undo
+  /// it; the joined screen with its button is the fallback when it fails. A
+  /// 0.0.3 device waits for the button.
+  Future<void> _joined(JoinedStep joined) async => _legacy ? _go(joined) : _finish(joined);
 
   Future<void> _finish(JoinedStep joined) async {
     _go(BusyStep(t.finishing));
@@ -460,7 +517,8 @@ class _SetupPageState extends State<SetupPage> {
               : null,
           urls: urls,
           claimed: e['claimed'] == true,
-          apOn: e['ap'] == 'on',
+          apOn: apOn(e['ap']),
+          hotspot: Hotspot.of(e['ap']),
           apPsk: e['apPsk'] is String ? e['apPsk'] as String : null,
         );
         _info = _info?.copyWith(claimed: e['claimed'] == true, hostname: host);
@@ -530,6 +588,7 @@ class _SetupPageState extends State<SetupPage> {
       AdminStep() => AdminForm(hostname: _info?.hostname ?? '', onSubmit: _claim),
       StatusStep(:final status) => StatusView(
         status: status,
+        hotspot: status.hotspot == null ? null : HotspotCard(hotspot: status.hotspot!, wifi: widget.wifi),
         wired: (_info?.ops.contains('setNetwork') ?? false) && status.ethernet.isNotEmpty,
         onConfigure: _chooseNetwork,
         onWired: () => _go(WiredStep(status)),
@@ -553,7 +612,18 @@ class _SetupPageState extends State<SetupPage> {
         onSubmit: (psk) => _join(s.ssid, psk, s.hidden, s.status),
       ),
       final JoinedStep s => JoinedView(step: s, onFinish: () => _finish(s)),
-      final DoneStep s => DoneView(step: s),
+      final DoneStep s => DoneView(
+        step: s,
+        open: widget.open,
+        hotspot: s.hotspot == null
+            ? null
+            : HotspotCard(
+                hotspot: s.hotspot!,
+                wifi: widget.wifi,
+                console: hotspotConsole(_status, s.urls),
+                open: widget.open,
+              ),
+      ),
     };
   }
 }
@@ -824,12 +894,14 @@ class StatusView extends StatelessWidget {
   const StatusView({
     super.key,
     required this.status,
+    this.hotspot,
     required this.wired,
     required this.onConfigure,
     required this.onWired,
   });
 
   final Status status;
+  final Widget? hotspot;
 
   /// The device offers `setNetwork` and has an Ethernet port.
   final bool wired;
@@ -865,6 +937,7 @@ class StatusView extends StatelessWidget {
         if (wifi) FilledButton(onPressed: onConfigure, child: Text(t.configureWifi)),
         if (wifi && wired) const SizedBox(height: 8),
         if (wired) FilledButton.tonal(onPressed: onWired, child: Text(t.configureWired)),
+        if (hotspot != null) ...[const SizedBox(height: 16), hotspot!],
       ],
     );
   }
@@ -1149,9 +1222,11 @@ class _PasswordFormState extends State<PasswordForm> {
 /// Step 9 done; the console (step 10) opens in the browser, where the
 /// device is claimed.
 class DoneView extends StatelessWidget {
-  const DoneView({super.key, required this.step});
+  const DoneView({super.key, required this.step, required this.open, this.hotspot});
 
   final DoneStep step;
+  final Future<void> Function(Uri url) open;
+  final Widget? hotspot;
 
   @override
   Widget build(BuildContext context) {
@@ -1173,12 +1248,10 @@ class DoneView extends StatelessWidget {
         for (final u in step.urls)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: OutlinedButton(
-              onPressed: () => launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication),
-              child: Text(u),
-            ),
+            child: OutlinedButton(onPressed: () => open(Uri.parse(u)), child: Text(u)),
           ),
         if (step.apOn) ...[const SizedBox(height: 12), Text(t.hotspotOn)],
+        if (hotspot != null) ...[const SizedBox(height: 16), hotspot!],
         if (apPsk != null) ...[
           const SizedBox(height: 16),
           Card(
@@ -1198,6 +1271,72 @@ class DoneView extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// The device's hotspot on its label key: the SSID and key to copy, the Wi-Fi
+/// QR code, and joining it from this phone, then opening [console] there.
+class HotspotCard extends StatefulWidget {
+  const HotspotCard({super.key, required this.hotspot, required this.wifi, this.console, this.open});
+
+  final Hotspot hotspot;
+  final Wifi wifi;
+  final Uri? console;
+  final Future<void> Function(Uri url)? open;
+
+  @override
+  State<HotspotCard> createState() => _HotspotCardState();
+}
+
+class _HotspotCardState extends State<HotspotCard> {
+  String _result = '';
+
+  Future<void> _join() async {
+    final t = AppLocalizations.of(context);
+    final ok = await widget.wifi.join(widget.hotspot.ssid, widget.hotspot.psk);
+    if (mounted) setState(() => _result = ok ? t.hotspotJoined : t.hotspotJoinFailed);
+    final console = widget.console, open = widget.open;
+    if (ok && console != null && open != null) await open(console);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final h = widget.hotspot;
+    Widget row(String label, String value, String tooltip) => Row(
+      children: [
+        SizedBox(width: 90, child: Text(label, style: Theme.of(context).textTheme.labelMedium)),
+        Expanded(
+          child: SelectableText(value, style: const TextStyle(fontFamily: 'monospace')),
+        ),
+        IconButton(
+          tooltip: tooltip,
+          icon: const Icon(Icons.copy, size: 18),
+          onPressed: () => Clipboard.setData(ClipboardData(text: value)),
+        ),
+      ],
+    );
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.hotspotTitle, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            row(t.hotspotSsid, h.ssid, t.copySsid),
+            row(t.hotspotKey, h.psk, t.copyKey),
+            const SizedBox(height: 8),
+            Center(
+              child: QrImageView(data: h.qr, size: 180, backgroundColor: Colors.white, semanticsLabel: t.hotspotQr),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonal(onPressed: _join, child: Text(t.joinHotspot)),
+            if (_result.isNotEmpty) ...[const SizedBox(height: 8), Text(_result)],
+          ],
+        ),
+      ),
     );
   }
 }

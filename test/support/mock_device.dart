@@ -71,6 +71,11 @@ class MockDevice {
     this.https = false,
     this.httpPort = 8080,
     this.httpsPort = 443,
+    this.apObject = true,
+    this.apSsid = 'mica-a4e2e69e',
+    this.labelKey = 'label-key-2f9c',
+    this.ownApKey = false,
+    this.finishFail,
     this.generatedApPsk = 'harbour-ap-key-7f3a',
     this.connectDelay = const Duration(milliseconds: 5),
   }) : _hostname0 = hostname,
@@ -112,6 +117,23 @@ class MockDevice {
   final String webMode;
   final bool https;
   final int httpPort, httpsPort;
+
+  /// `ap` as an object (N9) or the older `on`/`off` string in `finished`.
+  final bool apObject;
+  final String apSsid, labelKey;
+
+  /// The user set their own access-point key in the console.
+  final bool ownApKey;
+
+  /// A reason the first `finish` fails with.
+  String? finishFail;
+
+  /// The key goes out only while the device is unclaimed and on its label key.
+  Object _ap() => !apObject
+      ? (wifi.mode == 'ap' ? 'on' : 'off')
+      : wifi.mode == 'ap'
+      ? {'on': true, 'ssid': apSsid, 'psk': claimed || ownApKey ? null : labelKey}
+      : {'on': false};
 
   String _console(String host) {
     final (scheme, port, own) = https ? ('https', httpsPort, 443) : ('http', httpPort, 80);
@@ -229,6 +251,7 @@ class MockDevice {
     'ssid': wifi.ssid,
     'ip': wifi.ip,
     'interfaces': [for (final p in ports) p.toJson()],
+    if (apObject && wifi.mode == 'ap') 'ap': _ap(),
   };
 
   Future<void> _ready(SessionKeys k, Json ready) async {
@@ -384,6 +407,9 @@ class MockDevice {
         _broughtUp = port;
         return _event({'id': id, 'event': 'up', 'interface': port.name, 'address': port.address});
       case 'finish':
+        final fail = finishFail;
+        finishFail = null;
+        if (fail != null) return _event({'id': id, 'event': 'failed', 'reason': fail});
         return _finish(id, c);
     }
   }
@@ -432,7 +458,7 @@ class MockDevice {
           _console('$hostname.local'),
         ],
       ],
-      'ap': wifi.mode == 'ap' ? 'on' : 'off',
+      'ap': _ap(),
     });
     return close();
   }

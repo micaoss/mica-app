@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mica_app/ble.dart';
 import 'package:mica_app/main.dart';
 import 'package:mica_app/protocol/client.dart';
 import 'package:mica_app/protocol/crypto.dart';
 import 'package:mica_app/setup_page.dart';
+import 'package:mica_app/wifi.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'support/mock_device.dart';
 
@@ -35,6 +38,20 @@ class FakeBluetooth implements Bluetooth {
   Future<Transport> connect(FoundDevice d) async => device.connect();
 }
 
+/// The phone's Wi-Fi: records what it was asked to join.
+class FakeWifi implements Wifi {
+  FakeWifi({this.accept = true});
+
+  final bool accept;
+  final joined = <(String, String)>[];
+
+  @override
+  Future<bool> join(String ssid, String psk) async {
+    joined.add((ssid, psk));
+    return accept;
+  }
+}
+
 Future<({BigInt w0, BigInt w1})> inlineKdf(String pw, List<int> salt, int iterations) async =>
     spakeScalars(pw, salt, iterations);
 
@@ -43,12 +60,16 @@ Future<MockDevice> start(
   MockDevice device, {
   String lang = 'zh',
   RadioState radio = RadioState.on,
+  Wifi? wifi,
+  List<Uri>? opened,
 }) async {
   await tester.pumpWidget(
     MicaApp(
       key: UniqueKey(),
       radio: FakeBluetooth(device, radioState: radio),
       kdf: inlineKdf,
+      wifi: wifi ?? FakeWifi(),
+      open: (u) async => opened?.add(u),
       locale: Locale(lang),
     ),
   );
@@ -121,9 +142,9 @@ void main() {
     await tester.type('Wi-Fi 密码（开放网络留空）', 'harbour-wifi-1');
     await tester.tap(find.widgetWithText(FilledButton, '连接'));
     await tester.pumpAndSettle();
-    expect(find.text('已连接 Harbour，IP：192.168.8.41'), findsOneWidget);
+    // finish goes out as soon as the network is up: no joined screen.
     expect(find.text('主机名（可选）'), findsNothing);
-    await tester.tapText('完成配网');
+    expect(find.text('完成配网'), findsNothing);
     expect(find.text('配网完成'), findsOneWidget);
     expect(find.text('已连接。Wi-Fi 192.168.8.41。'), findsOneWidget);
     expect(find.text('http://192.168.8.41:8080'), findsOneWidget);
@@ -131,6 +152,7 @@ void main() {
     expect(find.text('此设备的控制台未对网络开放，无法从这里打开。'), findsNothing);
     expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备码——它印在设备标签上，也显示在设备自身的控制台上（串口 / 显示器登录提示）。'), findsOneWidget);
     expect(find.text('设备热点仍开启，在控制台设置你自己的密码之前，热点密码为设备标签上的密码。'), findsNothing);
+    expect(find.text('加入设备热点'), findsNothing);
     expect(find.text('设备热点的新密码'), findsNothing);
     expect(d.claimed, isFalse);
     expect(d.hostname, 'mica-a4e2e69e');
@@ -138,22 +160,85 @@ void main() {
     expect(d.commands.last, {'id': 3, 'op': 'finish'});
   });
 
+  testWidgets('an automatic finish that fails shows the reason and a finish button', (tester) async {
+    final d = await start(tester, MockDevice(routers: routers, finishFail: 'busy'));
+    await tester.reachWifiNetwork();
+    await tester.enterNetwork('Harbour', 'harbour-wifi-1');
+    expect(find.text('已连接 Harbour，IP：192.168.8.41'), findsOneWidget);
+    expect(find.text('设备忙，请稍候重试'), findsOneWidget);
+    await tester.tapText('完成配网');
+    expect(find.text('配网完成'), findsOneWidget);
+    expect(d.commands.map((c) => c['op']), ['getStatus', 'setWifi', 'finish', 'finish']);
+  });
+
   testWidgets('https console URLs are offered; an empty list says the console is not on the network', (tester) async {
     await start(tester, MockDevice(routers: routers, https: true));
     await tester.reachWifiNetwork();
     await tester.enterNetwork('Harbour', 'harbour-wifi-1');
-    await tester.tapText('完成配网');
     expect(find.text('https://192.168.8.41'), findsOneWidget);
     expect(find.text('https://mica-a4e2e69e.local'), findsOneWidget);
 
     await start(tester, MockDevice(routers: routers, webMode: 'off'));
     await tester.reachWifiNetwork();
     await tester.enterNetwork('Harbour', 'harbour-wifi-1');
-    await tester.tapText('完成配网');
     expect(find.text('配网完成'), findsOneWidget);
     expect(find.text('此设备的控制台未对网络开放，无法从这里打开。'), findsOneWidget);
     expect(find.text('打开控制台：'), findsNothing);
     expect(find.byType(OutlinedButton), findsNothing);
+  });
+
+  testWidgets('unclaimed, hotspot on the label key: SSID, key, QR and join, on the status and done screens', (
+    tester,
+  ) async {
+    final wifi = FakeWifi();
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+      return null;
+    });
+    final opened = <Uri>[];
+    await start(tester, unclaimed(), wifi: wifi, opened: opened);
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('加入设备热点'), findsOneWidget);
+    expect(find.text('label-key-2f9c'), findsOneWidget);
+    expect(find.byType(QrImageView), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('复制热点密码'));
+    await tester.tap(find.byTooltip('复制热点密码'));
+    await tester.pumpAndSettle();
+    expect(copied, ['label-key-2f9c']);
+    await tester.tapText('连接设备热点');
+    expect(wifi.joined, [('mica-a4e2e69e', 'label-key-2f9c')]);
+    expect(opened, isEmpty);
+
+    await tester.tapText('配置有线网络');
+    await tester.tapText('应用');
+    expect(find.text('配网完成'), findsOneWidget);
+    expect(find.text('加入设备热点'), findsOneWidget);
+    expect(find.text('label-key-2f9c'), findsOneWidget);
+    // On the done screen joining opens the console on the hotspot's address.
+    await tester.tapText('连接设备热点');
+    expect(opened, [Uri.parse('http://192.168.4.1:8080')]);
+  });
+
+  testWidgets('a phone that cannot join says to use the QR code or the Wi-Fi settings', (tester) async {
+    await start(tester, unclaimed(), wifi: FakeWifi(accept: false));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.tapText('连接设备热点');
+    expect(find.text('无法自动加入，请扫描二维码或在手机的 Wi-Fi 设置中加入。'), findsOneWidget);
+  });
+
+  testWidgets('no key, no block: an own key, or the older ap string', (tester) async {
+    await start(tester, MockDevice(ownApKey: true));
+    await tester.tapText('mica-a4e2e69e');
+    expect(find.text('当前状态'), findsOneWidget);
+    expect(find.text('加入设备热点'), findsNothing);
+
+    await start(tester, MockDevice(apObject: false));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.tapText('配置有线网络');
+    await tester.tapText('应用');
+    expect(find.text('设备热点仍开启，在控制台设置你自己的密码之前，热点密码为设备标签上的密码。'), findsOneWidget);
+    expect(find.text('加入设备热点'), findsNothing);
   });
 
   testWidgets('unclaimed, wired DHCP: the hotspot stays on with its label key', (tester) async {
@@ -163,8 +248,6 @@ void main() {
     expect(find.text('有线网络'), findsOneWidget);
     expect(find.text('end0'), findsOneWidget);
     await tester.tapText('应用');
-    expect(find.text('end0 已配置，地址：192.168.8.50/24'), findsOneWidget);
-    await tester.tapText('完成配网');
     expect(find.text('已连接。有线 192.168.8.50。'), findsOneWidget);
     expect(find.text('http://192.168.8.50:8080'), findsOneWidget);
     expect(find.text('设备热点仍开启，在控制台设置你自己的密码之前，热点密码为设备标签上的密码。'), findsOneWidget);
@@ -198,8 +281,9 @@ void main() {
     expect(d.commands, isEmpty);
     await tester.type('DNS 服务器（可选，用空格或逗号分隔）', '1.1.1.1, 2606:4700::1111');
     await tester.tapText('应用');
-    expect(find.text('end0 已配置，地址：10.0.0.5/24'), findsOneWidget);
-    expect(d.commands.single, {
+    expect(find.text('已连接。有线 10.0.0.5。'), findsOneWidget);
+    expect(d.commands.map((c) => c['op']), ['setNetwork', 'finish']);
+    expect(d.commands.first, {
       'id': 1,
       'op': 'setNetwork',
       'interface': 'end0',
@@ -338,10 +422,10 @@ void main() {
     await tester.type('Wi-Fi 密码（开放网络留空）', 'harbour-wifi-1');
     await tester.tap(find.widgetWithText(FilledButton, '连接'));
     await tester.pumpAndSettle();
-    await tester.tapText('完成配网');
     expect(find.text('已连接。Wi-Fi 192.168.8.41。'), findsOneWidget);
     expect(find.text('打开控制台设置管理员密码。控制台会要求输入设备码——它印在设备标签上，也显示在设备自身的控制台上（串口 / 显示器登录提示）。'), findsNothing);
     expect(d.sessionLog.where((m) => m['t'] == 'start').length, 2);
+    expect(find.text('加入设备热点'), findsNothing);
   });
 
   testWidgets('temp-code: typed with spaces, used without', (tester) async {
@@ -450,5 +534,20 @@ void main() {
     expect(isIpv4('2606:4700::1111'), isFalse);
     expect(isIp('2606:4700::1111'), isTrue);
     expect(splitList(' 1.1.1.1,9.9.9.9  8.8.8.8 '), ['1.1.1.1', '9.9.9.9', '8.8.8.8']);
+  });
+
+  test('the hotspot: both ap shapes; the Wi-Fi QR escapes its specials', () {
+    expect(
+      Hotspot.of({'on': true, 'ssid': 'mica-a4e2e69e', 'psk': 'label-key-2f9c'})!.qr,
+      'WIFI:T:WPA;S:mica-a4e2e69e;P:label-key-2f9c;;',
+    );
+    expect(const Hotspot(r'a;b,c:d\e"f', 'k;1').qr, r'WIFI:T:WPA;S:a\;b\,c\:d\\e\"f;P:k\;1;;');
+    expect(Hotspot.of({'on': true, 'ssid': 'x', 'psk': null}), isNull);
+    expect(Hotspot.of({'on': false, 'ssid': 'x', 'psk': 'label-key-2f9c'}), isNull);
+    expect(Hotspot.of('on'), isNull);
+    expect(apOn('on'), isTrue);
+    expect(apOn({'on': true}), isTrue);
+    expect(apOn('off'), isFalse);
+    expect(apOn({'on': false}), isFalse);
   });
 }

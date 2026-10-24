@@ -362,6 +362,33 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get hotspotTitle => '加入设备热点';
+
+  @override
+  String get hotspotSsid => '热点名称';
+
+  @override
+  String get hotspotKey => '热点密码';
+
+  @override
+  String get copySsid => '复制热点名称';
+
+  @override
+  String get copyKey => '复制热点密码';
+
+  @override
+  String get hotspotQr => '加入设备热点的二维码';
+
+  @override
+  String get joinHotspot => '连接设备热点';
+
+  @override
+  String get hotspotJoined => '手机已请求加入设备热点。';
+
+  @override
+  String get hotspotJoinFailed => '无法自动加入，请扫描二维码或在手机的 Wi-Fi 设置中加入。';
+
+  @override
   String get consoleAt => '打开控制台：';
 
   @override
