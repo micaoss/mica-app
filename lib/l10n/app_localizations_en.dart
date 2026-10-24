@@ -167,6 +167,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scanning => 'Scanning…';
 
   @override
+  String staleList(int minutes) {
+    return 'The list is from $minutes min ago';
+  }
+
+  @override
+  String get rescanAp => 'Rescan (briefly drops the hotspot)';
+
+  @override
   String get rescan => 'Scan again';
 
   @override

@@ -386,6 +386,18 @@ abstract class AppLocalizations {
   /// **'Scanning…'**
   String get scanning;
 
+  /// No description provided for @staleList.
+  ///
+  /// In en, this message translates to:
+  /// **'The list is from {minutes} min ago'**
+  String staleList(int minutes);
+
+  /// No description provided for @rescanAp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan (briefly drops the hotspot)'**
+  String get rescanAp;
+
   /// No description provided for @rescan.
   ///
   /// In en, this message translates to:

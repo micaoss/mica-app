@@ -49,6 +49,8 @@
   "configureWifi": "配置 Wi-Fi",
   "networkTitle": "选择网络",
   "scanning": "正在扫描…",
+  "staleList": "列表来自 {minutes} 分钟前",
+  "rescanAp": "重新扫描（会短暂断开热点）",
   "rescan": "重新扫描",
   "apNoScan": "设备当前为 Wi-Fi 接入点模式，不能扫描，请输入网络名称。",
   "scanFailed": "扫描失败，可以重新扫描或手动输入",

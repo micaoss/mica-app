@@ -156,8 +156,8 @@ void main() {
     expect(find.text('设备热点的新密码'), findsNothing);
     expect(d.claimed, isFalse);
     expect(d.hostname, 'mica-a4e2e69e');
-    expect(d.commands.map((c) => c['op']), ['getStatus', 'setWifi', 'finish']);
-    expect(d.commands.last, {'id': 3, 'op': 'finish'});
+    expect(d.commands.map((c) => c['op']), ['getStatus', 'scanWifi', 'setWifi', 'finish']);
+    expect(d.commands.last, {'id': 4, 'op': 'finish'});
   });
 
   testWidgets('an automatic finish that fails shows the reason and a finish button', (tester) async {
@@ -168,7 +168,36 @@ void main() {
     expect(find.text('设备忙，请稍候重试'), findsOneWidget);
     await tester.tapText('完成配网');
     expect(find.text('配网完成'), findsOneWidget);
-    expect(d.commands.map((c) => c['op']), ['getStatus', 'setWifi', 'finish', 'finish']);
+    expect(d.commands.map((c) => c['op']), ['getStatus', 'scanWifi', 'setWifi', 'finish', 'finish']);
+  });
+
+  testWidgets('a stale list says how old it is; the rescan that drops the hotspot gets a fresh one', (tester) async {
+    final d = await start(tester, MockDevice(routers: routers, networks: networks, scanAge: 300));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.tapText('配置 Wi-Fi');
+    expect(find.text('Harbour'), findsOneWidget);
+    expect(find.text('列表来自 5 分钟前'), findsOneWidget);
+    await tester.tapText('重新扫描（会短暂断开热点）');
+    expect(d.commands.last, {'id': 4, 'op': 'scanWifi', 'rescan': true});
+    expect(find.text('Harbour'), findsOneWidget);
+    expect(find.text('列表来自 5 分钟前'), findsNothing);
+    expect(find.text('重新扫描（会短暂断开热点）'), findsNothing);
+    await tester.tapText('Harbour');
+    expect(find.text('设备将关闭热点并连接 Harbour，连着设备热点的终端会断开'), findsOneWidget);
+  });
+
+  testWidgets('with no client on the hotspot the device scans; an empty stale list asks for the name', (tester) async {
+    await start(tester, MockDevice(routers: routers, networks: networks, apClient: false));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.tapText('配置 Wi-Fi');
+    expect(find.text('Marina Guest'), findsOneWidget);
+    expect(find.textContaining('分钟前'), findsNothing);
+
+    await start(tester, MockDevice(routers: routers, scanAge: 60));
+    await tester.tapText('mica-a4e2e69e');
+    await tester.tapText('配置 Wi-Fi');
+    expect(find.text('列表来自 1 分钟前'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '网络名称'), findsOneWidget);
   });
 
   testWidgets('https console URLs are offered; an empty list says the console is not on the network', (tester) async {
@@ -362,7 +391,7 @@ void main() {
       'password': 'admin-pass-1',
       'hostname': 'quay-7',
     });
-    expect(d.commands.last, {'id': 4, 'op': 'finish'});
+    expect(d.commands.last, {'id': 5, 'op': 'finish'});
   });
 
   for (final (reason, ssid, psk, text, back) in [

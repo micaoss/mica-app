@@ -163,6 +163,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get scanning => '正在扫描…';
 
   @override
+  String staleList(int minutes) {
+    return '列表来自 $minutes 分钟前';
+  }
+
+  @override
+  String get rescanAp => '重新扫描（会短暂断开热点）';
+
+  @override
   String get rescan => '重新扫描';
 
   @override

@@ -163,10 +163,14 @@ class StatusStep extends Step {
 }
 
 class NetworkStep extends Step {
-  const NetworkStep(this.status, this.networks, {required this.manual});
+  const NetworkStep(this.status, this.networks, {required this.manual, this.ageSeconds});
   final Status status;
   final List<Network>? networks;
   final bool manual;
+
+  /// A stale list's age: the device served its last scan rather than drop a
+  /// client off its access point.
+  final int? ageSeconds;
 }
 
 class PasswordStep extends Step {
@@ -429,16 +433,20 @@ class _SetupPageState extends State<SetupPage> {
     }
   }
 
-  Future<void> _chooseNetwork([String notice = '']) async {
+  /// [rescan] scans even with clients on the device's access point, which
+  /// lose it for the scan.
+  Future<void> _chooseNetwork([String notice = '', bool rescan = false]) async {
     _go(BusyStep(t.scanning));
     try {
       final status = await _getStatus();
       if (status == null) return;
-      if (status.wifiMode == 'ap') {
-        return _go(NetworkStep(status, null, manual: true), notice.isEmpty ? t.apNoScan : notice);
+      final e = await _client!.run('scanWifi', {if (rescan) 'rescan': true});
+      if (e.event == 'networks') {
+        final networks = mergeNetworks(e['networks']);
+        // A device from before `stale` sends none: a fresh list.
+        final age = e['stale'] == true && e['ageSeconds'] is int ? e['ageSeconds'] as int : null;
+        return _go(NetworkStep(status, networks, manual: networks.isEmpty, ageSeconds: age), notice);
       }
-      final e = await _client!.run('scanWifi');
-      if (e.event == 'networks') return _go(NetworkStep(status, mergeNetworks(e['networks']), manual: false), notice);
       final why = switch (e.reason) {
         'ap_active' => t.apNoScan,
         'scan_failed' => t.scanFailed,
@@ -603,6 +611,7 @@ class _SetupPageState extends State<SetupPage> {
         key: ObjectKey(s),
         step: s,
         onRescan: _chooseNetwork,
+        onRescanAp: () => _chooseNetwork('', true),
         onPick: (ssid, hidden) => _go(PasswordStep(ssid, hidden, s.status)),
       ),
       final PasswordStep s => PasswordForm(
@@ -1075,10 +1084,16 @@ class JoinedView extends StatelessWidget {
 
 /// Step 6: the scan list, or the name typed in (always in access-point mode).
 class NetworkForm extends StatefulWidget {
-  const NetworkForm({super.key, required this.step, required this.onRescan, required this.onPick});
+  const NetworkForm({
+    super.key,
+    required this.step,
+    required this.onRescan,
+    required this.onRescanAp,
+    required this.onPick,
+  });
 
   final NetworkStep step;
-  final VoidCallback onRescan;
+  final VoidCallback onRescan, onRescanAp;
   final void Function(String ssid, bool hidden) onPick;
 
   @override
@@ -1106,7 +1121,7 @@ class _NetworkFormState extends State<NetworkForm> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final networks = widget.step.networks;
+    final networks = widget.step.networks, age = widget.step.ageSeconds;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1123,10 +1138,12 @@ class _NetworkFormState extends State<NetworkForm> {
                 onTap: () => widget.onPick(n.ssid, false),
               ),
             ),
+          if (age != null) ...[const SizedBox(height: 4), Text(t.staleList(age < 90 ? 1 : (age / 60).round()))],
           Wrap(
             spacing: 8,
             children: [
-              OutlinedButton(onPressed: widget.onRescan, child: Text(t.rescan)),
+              if (age == null) OutlinedButton(onPressed: widget.onRescan, child: Text(t.rescan)),
+              if (age != null) OutlinedButton(onPressed: widget.onRescanAp, child: Text(t.rescanAp)),
               if (!_manual) OutlinedButton(onPressed: () => setState(() => _manual = true), child: Text(t.manual)),
             ],
           ),

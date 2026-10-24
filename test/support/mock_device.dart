@@ -76,6 +76,8 @@ class MockDevice {
     this.labelKey = 'label-key-2f9c',
     this.ownApKey = false,
     this.finishFail,
+    this.apClient = true,
+    this.scanAge,
     this.generatedApPsk = 'harbour-ap-key-7f3a',
     this.connectDelay = const Duration(milliseconds: 5),
   }) : _hostname0 = hostname,
@@ -124,6 +126,12 @@ class MockDevice {
 
   /// The user set their own access-point key in the console.
   final bool ownApKey;
+
+  /// A client is on the access point, so a scan beside it serves the last
+  /// list, [scanAge] seconds old (null: nothing scanned before), unless
+  /// `rescan` asks for a fresh one.
+  final bool apClient;
+  final int? scanAge;
 
   /// A reason the first `finish` fails with.
   String? finishFail;
@@ -345,8 +353,19 @@ class MockDevice {
       case 'getStatus':
         return _event({'id': id, 'event': 'status', ..._status()});
       case 'scanWifi':
-        if (wifi.mode == 'ap') return failed('ap_active');
-        return _event({'id': id, 'event': 'networks', 'networks': networks});
+        // A device from before N12 answers ap_active and sends no `stale`.
+        if (legacy) {
+          if (wifi.mode == 'ap') return failed('ap_active');
+          return _event({'id': id, 'event': 'networks', 'networks': networks});
+        }
+        final rescan = c['rescan'];
+        if (rescan != null && rescan is! bool) return failed('bad_request');
+        if (wifi.mode == 'ap' && apClient && rescan != true) {
+          final age = scanAge;
+          if (age == null) return failed('ap_active');
+          return _event({'id': id, 'event': 'networks', 'networks': networks, 'stale': true, 'ageSeconds': age});
+        }
+        return _event({'id': id, 'event': 'networks', 'networks': networks, 'stale': false});
       case 'claim':
         if (_auth != 'none') return failed('not_allowed');
         if (claimed) return failed('already_claimed');
