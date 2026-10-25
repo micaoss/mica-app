@@ -4,6 +4,12 @@
 <dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Bluetooth sends a mica device the Wi-Fi network to join.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Find mica devices on this network and manage them.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mica._tcp</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

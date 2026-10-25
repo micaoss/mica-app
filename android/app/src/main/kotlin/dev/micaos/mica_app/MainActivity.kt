@@ -12,11 +12,20 @@ import io.flutter.plugin.common.MethodChannel
 // `mica/wifi` join {ssid, psk}: the device's hotspot. Android 11+ shows the
 // system's add-network dialog; Android 10 adds a network suggestion; older
 // versions answer false and the app points at the QR code.
+//
+// The Wi-Fi drops multicast without a lock, and mDNS discovery is multicast:
+// held while the app runs.
 class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
+    private var multicast: WifiManager.MulticastLock? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        multicast = applicationContext.getSystemService(WifiManager::class.java)
+            .createMulticastLock("mica-mdns").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mica/wifi").setMethodCallHandler { call, result ->
             val ssid = call.argument<String>("ssid")
             val psk = call.argument<String>("psk")
@@ -39,6 +48,12 @@ class MainActivity : FlutterActivity() {
                 result.success(false)
             }
         }
+    }
+
+    override fun onDestroy() {
+        multicast?.release()
+        multicast = null
+        super.onDestroy()
     }
 
     @Deprecated("Deprecated in Java")

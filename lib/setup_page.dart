@@ -233,6 +233,7 @@ class SetupPage extends StatefulWidget {
     required this.wifi,
     required this.open,
     required this.onSwitchLanguage,
+    this.onManage,
   });
 
   final Bluetooth radio;
@@ -242,6 +243,9 @@ class SetupPage extends StatefulWidget {
   /// Opens a console URL in the phone's browser.
   final Future<void> Function(Uri url) open;
   final VoidCallback onSwitchLanguage;
+
+  /// Manages the device over the network from this app, at a console URL.
+  final void Function(Uri url)? onManage;
 
   @override
   State<SetupPage> createState() => _SetupPageState();
@@ -624,6 +628,7 @@ class _SetupPageState extends State<SetupPage> {
       final DoneStep s => DoneView(
         step: s,
         open: widget.open,
+        manage: widget.onManage,
         hotspot: s.hotspot == null
             ? null
             : HotspotCard(
@@ -1239,10 +1244,11 @@ class _PasswordFormState extends State<PasswordForm> {
 /// Step 9 done; the console (step 10) opens in the browser, where the
 /// device is claimed.
 class DoneView extends StatelessWidget {
-  const DoneView({super.key, required this.step, required this.open, this.hotspot});
+  const DoneView({super.key, required this.step, required this.open, this.manage, this.hotspot});
 
   final DoneStep step;
   final Future<void> Function(Uri url) open;
+  final void Function(Uri url)? manage;
   final Widget? hotspot;
 
   @override
@@ -1267,6 +1273,10 @@ class DoneView extends StatelessWidget {
             padding: const EdgeInsets.only(top: 8),
             child: OutlinedButton(onPressed: () => open(Uri.parse(u)), child: Text(u)),
           ),
+        if (manage != null && step.urls.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          FilledButton(onPressed: () => manage!(Uri.parse(step.urls.first)), child: Text(t.manageInApp)),
+        ],
         if (step.apOn) ...[const SizedBox(height: 12), Text(t.hotspotOn)],
         if (hotspot != null) ...[const SizedBox(height: 16), hotspot!],
         if (apPsk != null) ...[

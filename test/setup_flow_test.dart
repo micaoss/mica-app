@@ -11,6 +11,7 @@ import 'package:mica_app/setup_page.dart';
 import 'package:mica_app/wifi.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'support/mock_console.dart';
 import 'support/mock_device.dart';
 
 const routers = {'Harbour': WifiRouter('harbour-wifi-1', ip: '192.168.8.41')};
@@ -69,10 +70,14 @@ Future<MockDevice> start(
       radio: FakeBluetooth(device, radioState: radio),
       kdf: inlineKdf,
       wifi: wifi ?? FakeWifi(),
+      discovery: FakeDiscovery(MockNetwork({})),
+      store: MemoryStore(),
       open: (u) async => opened?.add(u),
       locale: Locale(lang),
     ),
   );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.bluetooth));
   await tester.pumpAndSettle();
   return device;
 }

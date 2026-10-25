@@ -461,4 +461,168 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resultWiredDhcpTimeout => '30 秒内没有获得 DHCP 地址。设置已保存';
+
+  @override
+  String get appTitle => 'mica';
+
+  @override
+  String get homeLead => '设置和管理 mica 设备。';
+
+  @override
+  String get homeBle => '蓝牙配网';
+
+  @override
+  String get homeBleHint => '设备处于蓝牙配网窗口时：配置它的 Wi-Fi 或有线网络，无需连接设备热点。';
+
+  @override
+  String get homeNetwork => '通过网络管理';
+
+  @override
+  String get homeNetworkHint => '与手机在同一网络、手机连着设备热点或网线直连的设备：首次设置、配网和状态；设备有没有蓝牙和网页控制台都可以。';
+
+  @override
+  String get manageTitle => '网络管理';
+
+  @override
+  String get discovered => '本网络中的设备';
+
+  @override
+  String get saved => '登录过的设备';
+
+  @override
+  String get searching => '正在本网络中查找设备…';
+
+  @override
+  String get noDiscovered => '没有设备响应。设备会在它接入的网络中广播自己；手机用网线直连设备，或设备关闭了广播时，请输入它的地址。';
+
+  @override
+  String get manualAddress => '设备地址';
+
+  @override
+  String get manualAddressHint => 'IP 地址、主机名.local，或设备登录提示中 Console 后的地址';
+
+  @override
+  String get connect => '连接';
+
+  @override
+  String get consoleLocal => '此设备的 API 只对设备本机开放，无法通过网络管理。';
+
+  @override
+  String unreachable(String address) {
+    return '设备在 $address 没有响应';
+  }
+
+  @override
+  String get certChanged => '设备出示的证书与第一次不同。如果设备被重置或更换了证书，请信任新证书；否则可能是别的东西在这个地址上响应。';
+
+  @override
+  String get certFingerprint => '新证书指纹';
+
+  @override
+  String get trustNew => '信任新证书';
+
+  @override
+  String get setupTitle => '首次设置';
+
+  @override
+  String get setupHint => '设置管理员密码，用于登录本 App 和控制台。';
+
+  @override
+  String get deviceCode => '设备码';
+
+  @override
+  String get deviceCodeHint => '印在设备标签上，也显示在设备的登录提示中';
+
+  @override
+  String get deviceCodeIncorrect => '设备码不正确';
+
+  @override
+  String get throttled => '尝试次数过多，请稍后再试';
+
+  @override
+  String get alreadyConfigured => '设备已经设置了管理员，请登录';
+
+  @override
+  String get signInTitle => '登录';
+
+  @override
+  String get signIn => '登录';
+
+  @override
+  String get dashTitle => '设备状态';
+
+  @override
+  String get health => '健康状态';
+
+  @override
+  String get healthOk => '正常';
+
+  @override
+  String get healthDown => 'micad 无响应';
+
+  @override
+  String get software => '系统版本';
+
+  @override
+  String get board => '板卡';
+
+  @override
+  String get deployment => '部署';
+
+  @override
+  String get kernel => '内核';
+
+  @override
+  String get uptime => '运行时间';
+
+  @override
+  String uptimeValue(int days, int hours, int minutes) {
+    return '$days 天 $hours 小时 $minutes 分';
+  }
+
+  @override
+  String get clock => '时钟';
+
+  @override
+  String get synchronized => '已同步';
+
+  @override
+  String get notSynchronized => '未同步';
+
+  @override
+  String get features => '功能';
+
+  @override
+  String get noAddress => '无地址';
+
+  @override
+  String get noConsole => '此设备没有网页控制台，请在这里管理。';
+
+  @override
+  String get refresh => '刷新';
+
+  @override
+  String get signOut => '退出登录';
+
+  @override
+  String get sessionExpired => '登录已失效，请重新登录';
+
+  @override
+  String get forget => '移除';
+
+  @override
+  String get manageInApp => '在 App 中管理';
+
+  @override
+  String requestFailed(String code) {
+    return '设备拒绝了请求：$code';
+  }
+
+  @override
+  String get connectionLost => '与设备的连接中断';
+
+  @override
+  String apiUnsupported(String version) {
+    return '设备使用 API $version，请更新 App';
+  }
 }

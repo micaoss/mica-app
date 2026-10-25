@@ -69,7 +69,13 @@
   "networkTitle": "Choose a network",
   "scanning": "Scanning…",
   "staleList": "The list is from {minutes} min ago",
-  "@staleList": {"placeholders": {"minutes": {"type": "int"}}},
+  "@staleList": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "rescanAp": "Rescan (briefly drops the hotspot)",
   "rescan": "Scan again",
   "apNoScan": "The device is a Wi-Fi access point and cannot scan: enter the network name.",
@@ -205,5 +211,91 @@
   "resultBridgePortAddressed": "This port belongs to a bridge and has no addressing of its own",
   "resultBridgePortTaken": "The port is in more than one bridge",
   "resultNoCarrier": "No cable is plugged in. The settings are saved and apply once one is",
-  "resultWiredDhcpTimeout": "No DHCP address within 30 seconds. The settings are saved"
+  "resultWiredDhcpTimeout": "No DHCP address within 30 seconds. The settings are saved",
+  "appTitle": "mica",
+  "homeLead": "Set up and manage mica devices.",
+  "homeBle": "Bluetooth setup",
+  "homeBleHint": "A device in its Bluetooth setup window: its Wi-Fi or wired network, without joining its hotspot.",
+  "homeNetwork": "Manage over the network",
+  "homeNetworkHint": "A device on this phone's network, on its own hotspot or on a cable to this phone: first setup, network and status, with or without Bluetooth and a web console.",
+  "manageTitle": "Network management",
+  "discovered": "On this network",
+  "saved": "Signed in before",
+  "searching": "Looking for devices on this network…",
+  "noDiscovered": "No device answered. A device announces itself on the network it is cabled or joined to; with the phone on a cable to the device, or with announcements off, type its address.",
+  "manualAddress": "Device address",
+  "manualAddressHint": "An IP address, hostname.local, or the Console line of the device's login prompt",
+  "connect": "Connect",
+  "consoleLocal": "This device's API serves only the device itself: it cannot be managed over the network.",
+  "unreachable": "The device did not answer at {address}",
+  "@unreachable": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+  "certChanged": "The device presented another certificate than the one it presented first. If it was reset or its certificate replaced, trust the new one; otherwise something else may be answering at this address.",
+  "certFingerprint": "New certificate fingerprint",
+  "trustNew": "Trust the new certificate",
+  "setupTitle": "First setup",
+  "setupHint": "Set the administrator password. It signs in to this app and to the console.",
+  "deviceCode": "Device code",
+  "deviceCodeHint": "On the device's label, and on its login prompt",
+  "deviceCodeIncorrect": "That is not this device's code",
+  "throttled": "Too many attempts: wait a moment and try again",
+  "alreadyConfigured": "The device already has an administrator: sign in",
+  "signInTitle": "Sign in",
+  "signIn": "Sign in",
+  "dashTitle": "Device status",
+  "health": "Health",
+  "healthOk": "Responding",
+  "healthDown": "micad is not responding",
+  "software": "Software",
+  "board": "Board",
+  "deployment": "Deployment",
+  "kernel": "Kernel",
+  "uptime": "Uptime",
+  "uptimeValue": "{days} d {hours} h {minutes} min",
+  "@uptimeValue": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "clock": "Clock",
+  "synchronized": "Synchronized",
+  "notSynchronized": "Not synchronized",
+  "features": "Features",
+  "noAddress": "no address",
+  "noConsole": "This device has no web console: manage it here.",
+  "refresh": "Refresh",
+  "signOut": "Sign out",
+  "sessionExpired": "Signed out: sign in again",
+  "forget": "Forget",
+  "manageInApp": "Manage in the app",
+  "requestFailed": "The device refused: {code}",
+  "@requestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "connectionLost": "Lost the connection to the device",
+  "apiUnsupported": "The device speaks API {version}: update the app",
+  "@apiUnsupported": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  }
 }

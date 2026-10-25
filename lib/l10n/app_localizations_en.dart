@@ -470,4 +470,172 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resultWiredDhcpTimeout => 'No DHCP address within 30 seconds. The settings are saved';
+
+  @override
+  String get appTitle => 'mica';
+
+  @override
+  String get homeLead => 'Set up and manage mica devices.';
+
+  @override
+  String get homeBle => 'Bluetooth setup';
+
+  @override
+  String get homeBleHint =>
+      'A device in its Bluetooth setup window: its Wi-Fi or wired network, without joining its hotspot.';
+
+  @override
+  String get homeNetwork => 'Manage over the network';
+
+  @override
+  String get homeNetworkHint =>
+      'A device on this phone\'s network, on its own hotspot or on a cable to this phone: first setup, network and status, with or without Bluetooth and a web console.';
+
+  @override
+  String get manageTitle => 'Network management';
+
+  @override
+  String get discovered => 'On this network';
+
+  @override
+  String get saved => 'Signed in before';
+
+  @override
+  String get searching => 'Looking for devices on this network…';
+
+  @override
+  String get noDiscovered =>
+      'No device answered. A device announces itself on the network it is cabled or joined to; with the phone on a cable to the device, or with announcements off, type its address.';
+
+  @override
+  String get manualAddress => 'Device address';
+
+  @override
+  String get manualAddressHint => 'An IP address, hostname.local, or the Console line of the device\'s login prompt';
+
+  @override
+  String get connect => 'Connect';
+
+  @override
+  String get consoleLocal => 'This device\'s API serves only the device itself: it cannot be managed over the network.';
+
+  @override
+  String unreachable(String address) {
+    return 'The device did not answer at $address';
+  }
+
+  @override
+  String get certChanged =>
+      'The device presented another certificate than the one it presented first. If it was reset or its certificate replaced, trust the new one; otherwise something else may be answering at this address.';
+
+  @override
+  String get certFingerprint => 'New certificate fingerprint';
+
+  @override
+  String get trustNew => 'Trust the new certificate';
+
+  @override
+  String get setupTitle => 'First setup';
+
+  @override
+  String get setupHint => 'Set the administrator password. It signs in to this app and to the console.';
+
+  @override
+  String get deviceCode => 'Device code';
+
+  @override
+  String get deviceCodeHint => 'On the device\'s label, and on its login prompt';
+
+  @override
+  String get deviceCodeIncorrect => 'That is not this device\'s code';
+
+  @override
+  String get throttled => 'Too many attempts: wait a moment and try again';
+
+  @override
+  String get alreadyConfigured => 'The device already has an administrator: sign in';
+
+  @override
+  String get signInTitle => 'Sign in';
+
+  @override
+  String get signIn => 'Sign in';
+
+  @override
+  String get dashTitle => 'Device status';
+
+  @override
+  String get health => 'Health';
+
+  @override
+  String get healthOk => 'Responding';
+
+  @override
+  String get healthDown => 'micad is not responding';
+
+  @override
+  String get software => 'Software';
+
+  @override
+  String get board => 'Board';
+
+  @override
+  String get deployment => 'Deployment';
+
+  @override
+  String get kernel => 'Kernel';
+
+  @override
+  String get uptime => 'Uptime';
+
+  @override
+  String uptimeValue(int days, int hours, int minutes) {
+    return '$days d $hours h $minutes min';
+  }
+
+  @override
+  String get clock => 'Clock';
+
+  @override
+  String get synchronized => 'Synchronized';
+
+  @override
+  String get notSynchronized => 'Not synchronized';
+
+  @override
+  String get features => 'Features';
+
+  @override
+  String get noAddress => 'no address';
+
+  @override
+  String get noConsole => 'This device has no web console: manage it here.';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get signOut => 'Sign out';
+
+  @override
+  String get sessionExpired => 'Signed out: sign in again';
+
+  @override
+  String get forget => 'Forget';
+
+  @override
+  String get manageInApp => 'Manage in the app';
+
+  @override
+  String requestFailed(String code) {
+    return 'The device refused: $code';
+  }
+
+  @override
+  String get connectionLost => 'Lost the connection to the device';
+
+  @override
+  String apiUnsupported(String version) {
+    return 'The device speaks API $version: update the app';
+  }
 }

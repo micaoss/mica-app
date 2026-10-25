@@ -1,5 +1,5 @@
 name: mica_app
-description: "Set up a mica device's Wi-Fi over Bluetooth: micad's BLE provisioning protocol 1."
+description: "Set up and manage mica devices: micad's BLE provisioning protocol 1, and the device's HTTP API."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -16,6 +16,8 @@ dependencies:
   pointycastle: ^4.0.0
   url_launcher: ^6.3.3
   qr_flutter: ^4.1.0
+  multicast_dns: ^0.3.3+1
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:

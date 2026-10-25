@@ -949,6 +949,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No DHCP address within 30 seconds. The settings are saved'**
   String get resultWiredDhcpTimeout;
+
+  /// No description provided for @appTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'mica'**
+  String get appTitle;
+
+  /// No description provided for @homeLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up and manage mica devices.'**
+  String get homeLead;
+
+  /// No description provided for @homeBle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth setup'**
+  String get homeBle;
+
+  /// No description provided for @homeBleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A device in its Bluetooth setup window: its Wi-Fi or wired network, without joining its hotspot.'**
+  String get homeBleHint;
+
+  /// No description provided for @homeNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage over the network'**
+  String get homeNetwork;
+
+  /// No description provided for @homeNetworkHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A device on this phone\'s network, on its own hotspot or on a cable to this phone: first setup, network and status, with or without Bluetooth and a web console.'**
+  String get homeNetworkHint;
+
+  /// No description provided for @manageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Network management'**
+  String get manageTitle;
+
+  /// No description provided for @discovered.
+  ///
+  /// In en, this message translates to:
+  /// **'On this network'**
+  String get discovered;
+
+  /// No description provided for @saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in before'**
+  String get saved;
+
+  /// No description provided for @searching.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for devices on this network…'**
+  String get searching;
+
+  /// No description provided for @noDiscovered.
+  ///
+  /// In en, this message translates to:
+  /// **'No device answered. A device announces itself on the network it is cabled or joined to; with the phone on a cable to the device, or with announcements off, type its address.'**
+  String get noDiscovered;
+
+  /// No description provided for @manualAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Device address'**
+  String get manualAddress;
+
+  /// No description provided for @manualAddressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'An IP address, hostname.local, or the Console line of the device\'s login prompt'**
+  String get manualAddressHint;
+
+  /// No description provided for @connect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get connect;
+
+  /// No description provided for @consoleLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s API serves only the device itself: it cannot be managed over the network.'**
+  String get consoleLocal;
+
+  /// No description provided for @unreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'The device did not answer at {address}'**
+  String unreachable(String address);
+
+  /// No description provided for @certChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The device presented another certificate than the one it presented first. If it was reset or its certificate replaced, trust the new one; otherwise something else may be answering at this address.'**
+  String get certChanged;
+
+  /// No description provided for @certFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'New certificate fingerprint'**
+  String get certFingerprint;
+
+  /// No description provided for @trustNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Trust the new certificate'**
+  String get trustNew;
+
+  /// No description provided for @setupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'First setup'**
+  String get setupTitle;
+
+  /// No description provided for @setupHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the administrator password. It signs in to this app and to the console.'**
+  String get setupHint;
+
+  /// No description provided for @deviceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Device code'**
+  String get deviceCode;
+
+  /// No description provided for @deviceCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On the device\'s label, and on its login prompt'**
+  String get deviceCodeHint;
+
+  /// No description provided for @deviceCodeIncorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not this device\'s code'**
+  String get deviceCodeIncorrect;
+
+  /// No description provided for @throttled.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts: wait a moment and try again'**
+  String get throttled;
+
+  /// No description provided for @alreadyConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'The device already has an administrator: sign in'**
+  String get alreadyConfigured;
+
+  /// No description provided for @signInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signInTitle;
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signIn;
+
+  /// No description provided for @dashTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device status'**
+  String get dashTitle;
+
+  /// No description provided for @health.
+  ///
+  /// In en, this message translates to:
+  /// **'Health'**
+  String get health;
+
+  /// No description provided for @healthOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Responding'**
+  String get healthOk;
+
+  /// No description provided for @healthDown.
+  ///
+  /// In en, this message translates to:
+  /// **'micad is not responding'**
+  String get healthDown;
+
+  /// No description provided for @software.
+  ///
+  /// In en, this message translates to:
+  /// **'Software'**
+  String get software;
+
+  /// No description provided for @board.
+  ///
+  /// In en, this message translates to:
+  /// **'Board'**
+  String get board;
+
+  /// No description provided for @deployment.
+  ///
+  /// In en, this message translates to:
+  /// **'Deployment'**
+  String get deployment;
+
+  /// No description provided for @kernel.
+  ///
+  /// In en, this message translates to:
+  /// **'Kernel'**
+  String get kernel;
+
+  /// No description provided for @uptime.
+  ///
+  /// In en, this message translates to:
+  /// **'Uptime'**
+  String get uptime;
+
+  /// No description provided for @uptimeValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} d {hours} h {minutes} min'**
+  String uptimeValue(int days, int hours, int minutes);
+
+  /// No description provided for @clock.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock'**
+  String get clock;
+
+  /// No description provided for @synchronized.
+  ///
+  /// In en, this message translates to:
+  /// **'Synchronized'**
+  String get synchronized;
+
+  /// No description provided for @notSynchronized.
+  ///
+  /// In en, this message translates to:
+  /// **'Not synchronized'**
+  String get notSynchronized;
+
+  /// No description provided for @features.
+  ///
+  /// In en, this message translates to:
+  /// **'Features'**
+  String get features;
+
+  /// No description provided for @noAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'no address'**
+  String get noAddress;
+
+  /// No description provided for @noConsole.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no web console: manage it here.'**
+  String get noConsole;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// No description provided for @signOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get signOut;
+
+  /// No description provided for @sessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out: sign in again'**
+  String get sessionExpired;
+
+  /// No description provided for @forget.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get forget;
+
+  /// No description provided for @manageInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage in the app'**
+  String get manageInApp;
+
+  /// No description provided for @requestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The device refused: {code}'**
+  String requestFailed(String code);
+
+  /// No description provided for @connectionLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost the connection to the device'**
+  String get connectionLost;
+
+  /// No description provided for @apiUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The device speaks API {version}: update the app'**
+  String apiUnsupported(String version);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
