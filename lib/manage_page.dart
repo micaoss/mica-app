@@ -8,6 +8,7 @@ import 'console/client.dart';
 import 'console/devices.dart';
 import 'console/discovery.dart';
 import 'l10n/app_localizations.dart';
+import 'manage_settings.dart';
 import 'setup_page.dart' show Alert;
 
 // Managing a device over its HTTP API, for one with no Bluetooth or no web
@@ -73,6 +74,16 @@ class Dash {
 
 class DashStage extends Stage {
   const DashStage(this.dash);
+  final Dash dash;
+}
+
+class NetworkStage extends Stage {
+  const NetworkStage(this.dash);
+  final Dash dash;
+}
+
+class SettingsStage extends Stage {
+  const SettingsStage(this.dash);
   final Dash dash;
 }
 
@@ -272,6 +283,8 @@ class _ManagePageState extends State<ManagePage> {
     }
   }
 
+  void _expired() => _go(const SignInStage(), t.sessionExpired);
+
   Future<void> _signOut() async {
     try {
       await _client?.logout();
@@ -347,8 +360,23 @@ class _ManagePageState extends State<ManagePage> {
       DashStage(:final dash) => DashView(
         dash: dash,
         onRefresh: _load,
+        onNetwork: () => _go(NetworkStage(dash)),
+        onSettings: () => _go(SettingsStage(dash)),
         onOpenConsole: () => widget.open(_device!.base),
         onSignOut: _signOut,
+      ),
+      NetworkStage(:final dash) => NetworkView(
+        client: _client!,
+        wifi: dash.features.contains('wifi'),
+        onExpired: _expired,
+        onBack: _load,
+      ),
+      SettingsStage(:final dash) => SettingsView(
+        client: _client!,
+        hostname: dash.hostname ?? '',
+        ssh: dash.features.contains('ssh'),
+        onExpired: _expired,
+        onBack: _load,
       ),
     };
   }
@@ -639,12 +667,14 @@ class DashView extends StatelessWidget {
     super.key,
     required this.dash,
     required this.onRefresh,
+    required this.onNetwork,
+    required this.onSettings,
     required this.onOpenConsole,
     required this.onSignOut,
   });
 
   final Dash dash;
-  final VoidCallback onRefresh, onOpenConsole, onSignOut;
+  final VoidCallback onRefresh, onNetwork, onSettings, onOpenConsole, onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -703,6 +733,26 @@ class DashView extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: onNetwork,
+                icon: const Icon(Icons.lan_outlined),
+                label: Text(t.networkButton),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: onSettings,
+                icon: const Icon(Icons.settings_outlined),
+                label: Text(t.settingsButton),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         if (dash.console) FilledButton(onPressed: onOpenConsole, child: Text(t.openConsole)) else Text(t.noConsole),
         const SizedBox(height: 8),
         OutlinedButton(onPressed: onRefresh, child: Text(t.refresh)),

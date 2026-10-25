@@ -1261,6 +1261,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The device speaks API {version}: update the app'**
   String apiUnsupported(String version);
+
+  /// No description provided for @networkButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get networkButton;
+
+  /// No description provided for @settingsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'System settings'**
+  String get settingsButton;
+
+  /// No description provided for @applied.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved and applied'**
+  String get applied;
+
+  /// No description provided for @applyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved, but applying it failed: {message}'**
+  String applyFailed(String message);
+
+  /// No description provided for @applyPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved; the device is still applying it'**
+  String get applyPending;
+
+  /// No description provided for @maybeMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'The device stopped answering: it may have moved to another network or address. Find it again from the list.'**
+  String get maybeMoved;
+
+  /// No description provided for @wrongCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'The current password is wrong'**
+  String get wrongCurrent;
+
+  /// No description provided for @removing.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing {ssid}…'**
+  String removing(String ssid);
+
+  /// No description provided for @notConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not declared (DHCP)'**
+  String get notConfigured;
+
+  /// No description provided for @noKnownNetworks.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved networks'**
+  String get noKnownNetworks;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// No description provided for @noWiredPorts.
+  ///
+  /// In en, this message translates to:
+  /// **'The device has no wired port'**
+  String get noWiredPorts;
+
+  /// No description provided for @saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get saving;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the administrator password'**
+  String get changePassword;
+
+  /// No description provided for @currentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get currentPassword;
+
+  /// No description provided for @sshServer.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH server'**
+  String get sshServer;
+
+  /// No description provided for @sshKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorized keys'**
+  String get sshKeys;
+
+  /// No description provided for @noSshKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'No authorized keys'**
+  String get noSshKeys;
+
+  /// No description provided for @addSshKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a key'**
+  String get addSshKey;
+
+  /// No description provided for @sshKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host'**
+  String get sshKeyHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

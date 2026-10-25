@@ -19,7 +19,41 @@ class MockConsole {
     this.features = const ['ssh', 'containers'],
     this.console = true,
     this.certificate = 'aa11',
-  });
+    this.wifiEnabled = true,
+    this.wifiMode = 'ap',
+    this.scan = const [],
+    Map<String, Map<String, Object?>>? configured,
+    this.applyFailure,
+  }) : configured = configured ?? {};
+
+  bool wifiEnabled;
+  String wifiMode;
+
+  /// What a scan finds, `{ssid, bssid, signalDbm, flags}`.
+  final List<Map<String, Object?>> scan;
+  final networks = <Map<String, Object?>>[];
+  final Map<String, Map<String, Object?>> configured;
+  bool sshEnabled = false;
+  final keys = <Map<String, Object?>>[];
+
+  /// The message every apply fails with, when set.
+  String? applyFailure;
+
+  /// Answers nothing from now on: it moved to another address.
+  bool gone = false;
+  final _tasks = <String, Map<String, Object?>>{};
+
+  Reply _accepted() {
+    final id = 't${_tasks.length}';
+    _tasks[id] = {
+      'id': id,
+      'status': 'finished',
+      'phase': 'applied',
+      'outcome': applyFailure == null ? 'succeeded' : 'failed',
+      'message': ?applyFailure,
+    };
+    return _json(202, {'taskId': id});
+  }
 
   /// Null while the device is in setup.
   String? password;
@@ -131,21 +165,117 @@ class MockConsole {
             },
             {
               'name': 'eth0',
-              'link': {'operationalState': 'routable'},
+              'type': 'ether',
+              'link': {'operationalState': 'routable', 'carrier': true},
               'addresses': [
                 {'address': '192.168.1.57', 'prefixLength': 24, 'family': 'ipv4', 'scope': 'global'},
                 {'address': 'fe80::1', 'prefixLength': 64, 'family': 'ipv6', 'scope': 'link'},
               ],
             },
             {'name': 'veth3', 'link': {}, 'addresses': []},
+            {
+              'name': 'eth1',
+              'type': 'ether',
+              'link': {'operationalState': 'no-carrier', 'carrier': false},
+              'addresses': [],
+            },
           ],
         },
         'defaultRoutes': {'available': true, 'entries': []},
       }),
       ('POST', '/api/v1/actions/change-password') =>
         b['currentPassword'] != password ? _error(403, 'wrong_password') : _changed(b, cookie!),
+      ('PUT', '/api/v1/settings/hostname') => _setHostname(body),
+      ('GET', '/api/v1/settings/access.ssh.enabled') => _json(200, sshEnabled),
+      ('PUT', '/api/v1/settings/access.ssh.enabled') => _setSsh(body),
+      ('GET', '/api/v1/wifi') => _json(200, {'enabled': wifiEnabled, 'mode': wifiMode, 'locked': false}),
+      ('PUT', '/api/v1/wifi') => _setRole(b),
+      ('GET', '/api/v1/wifi/client/networks') => _json(200, [
+        for (final n in networks) {...n, if (n['psk'] != null) 'psk': '<redacted>'},
+      ]),
+      ('POST', '/api/v1/wifi/client/networks') => _addNetwork(b),
+      ('POST', '/api/v1/wifi/client/scan') =>
+        wifiEnabled && wifiMode == 'client'
+            ? _json(200, {'available': true, 'interface': 'wlan0', 'networks': scan})
+            : _json(200, {'available': false, 'reason': 'access-point'}),
+      ('GET', '/api/v1/network') => _json(200, {
+        'configured': configured,
+        'configuredCount': configured.length,
+        'version': 'v${configured.length}',
+        'observed': <String, Object?>{},
+      }),
+      ('GET', '/api/v1/ssh/authorized-keys') => _json(200, {'keys': keys, 'notice': 'root'}),
+      ('POST', '/api/v1/ssh/authorized-keys') => _addKey(b),
+      _ when method == 'GET' && path.startsWith('/api/v1/tasks/') =>
+        _tasks[path.substring(14)] == null ? _error(404, 'task_not_found') : _json(200, _tasks[path.substring(14)]),
+      _ when method == 'DELETE' && path.startsWith('/api/v1/wifi/client/networks/') => _removeNetwork(
+        Uri.decodeComponent(path.substring(29)),
+      ),
+      _ when method == 'DELETE' && path.startsWith('/api/v1/ssh/authorized-keys/') => _removeKey(
+        Uri.decodeComponent(path.substring(28)),
+      ),
+      _ when method == 'PUT' && path.startsWith('/api/v1/network/') => _setInterface(
+        Uri.decodeComponent(path.substring(16)),
+        b,
+      ),
       _ => _error(404, 'not_found'),
     };
+  }
+
+  Reply _setHostname(Object? v) {
+    if (v is! String || v.isEmpty) return _error(422, 'validation_failed');
+    hostname = v;
+    return _accepted();
+  }
+
+  Reply _setSsh(Object? v) {
+    if (v is! bool) return _error(422, 'validation_failed');
+    sshEnabled = v;
+    return _accepted();
+  }
+
+  Reply _setRole(Map b) {
+    if (b['enabled'] is! bool || (b['mode'] != 'client' && b['mode'] != 'ap')) {
+      return _error(422, 'validation_failed');
+    }
+    wifiEnabled = b['enabled'] as bool;
+    wifiMode = b['mode'] as String;
+    return _accepted();
+  }
+
+  Reply _addNetwork(Map b) {
+    if (b['ssid'] is! String || b['hidden'] is! bool || b['priority'] is! int) return _error(422, 'validation_failed');
+    if (networks.any((n) => n['ssid'] == b['ssid'])) return _error(409, 'network_exists');
+    networks.add({...b.cast<String, Object?>()});
+    return _json(201, b);
+  }
+
+  Reply _removeNetwork(String ssid) {
+    final before = networks.length;
+    networks.removeWhere((n) => n['ssid'] == ssid);
+    return networks.length == before ? _error(404, 'network_not_found') : const Reply(204, '');
+  }
+
+  Reply _addKey(Map b) {
+    final parts = '${b['key']}'.split(' ');
+    if (parts.length < 2 || !parts[0].startsWith('ssh-')) return _error(422, 'key_invalid');
+    final entry = {'key': b['key'], 'fingerprint': 'SHA256:${parts[1]}', 'comment': parts.length > 2 ? parts[2] : null};
+    keys.add(entry);
+    return _json(201, entry);
+  }
+
+  Reply _removeKey(String fingerprint) {
+    keys.removeWhere((k) => k['fingerprint'] == fingerprint);
+    return const Reply(204, '');
+  }
+
+  Reply _setInterface(String name, Map b) {
+    if (b['kind'] is! String || b['dhcp'] is! bool) return _error(422, 'validation_failed');
+    if (b['dhcp'] == false && b['static'] is Map && !'${(b['static'] as Map)['address']}'.contains('/')) {
+      return _error(422, 'validation_failed');
+    }
+    configured[name] = b.cast<String, Object?>();
+    return _accepted();
   }
 
   Reply _changed(Map b, String keep) {
@@ -182,7 +312,7 @@ class _MockTransport implements Transport {
   @override
   Future<Reply> send(String method, String path, {Object? body, Map<String, String> headers = const {}}) async {
     final device = network.devices[base];
-    if (device == null) throw const SocketException('no route to host');
+    if (device == null || device.gone) throw const SocketException('no route to host');
     if (base.scheme == 'https') {
       seen = device.certificate;
       if (pin != null && pin != seen) throw PinMismatch(seen!);

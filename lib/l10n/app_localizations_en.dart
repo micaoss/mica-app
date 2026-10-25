@@ -638,4 +638,72 @@ class AppLocalizationsEn extends AppLocalizations {
   String apiUnsupported(String version) {
     return 'The device speaks API $version: update the app';
   }
+
+  @override
+  String get networkButton => 'Network';
+
+  @override
+  String get settingsButton => 'System settings';
+
+  @override
+  String get applied => 'Saved and applied';
+
+  @override
+  String applyFailed(String message) {
+    return 'Saved, but applying it failed: $message';
+  }
+
+  @override
+  String get applyPending => 'Saved; the device is still applying it';
+
+  @override
+  String get maybeMoved =>
+      'The device stopped answering: it may have moved to another network or address. Find it again from the list.';
+
+  @override
+  String get wrongCurrent => 'The current password is wrong';
+
+  @override
+  String removing(String ssid) {
+    return 'Removing $ssid…';
+  }
+
+  @override
+  String get notConfigured => 'Not declared (DHCP)';
+
+  @override
+  String get noKnownNetworks => 'No saved networks';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String get noWiredPorts => 'The device has no wired port';
+
+  @override
+  String get saving => 'Saving…';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get changePassword => 'Change the administrator password';
+
+  @override
+  String get currentPassword => 'Current password';
+
+  @override
+  String get sshServer => 'SSH server';
+
+  @override
+  String get sshKeys => 'Authorized keys';
+
+  @override
+  String get noSshKeys => 'No authorized keys';
+
+  @override
+  String get addSshKey => 'Add a key';
+
+  @override
+  String get sshKeyHint => 'One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host';
 }

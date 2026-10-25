@@ -297,5 +297,40 @@
         "type": "String"
       }
     }
-  }
+  },
+  "networkButton": "Network",
+  "settingsButton": "System settings",
+  "applied": "Saved and applied",
+  "applyFailed": "Saved, but applying it failed: {message}",
+  "@applyFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "applyPending": "Saved; the device is still applying it",
+  "maybeMoved": "The device stopped answering: it may have moved to another network or address. Find it again from the list.",
+  "wrongCurrent": "The current password is wrong",
+  "removing": "Removing {ssid}…",
+  "@removing": {
+    "placeholders": {
+      "ssid": {
+        "type": "String"
+      }
+    }
+  },
+  "notConfigured": "Not declared (DHCP)",
+  "noKnownNetworks": "No saved networks",
+  "remove": "Remove",
+  "noWiredPorts": "The device has no wired port",
+  "saving": "Saving…",
+  "save": "Save",
+  "changePassword": "Change the administrator password",
+  "currentPassword": "Current password",
+  "sshServer": "SSH server",
+  "sshKeys": "Authorized keys",
+  "noSshKeys": "No authorized keys",
+  "addSshKey": "Add a key",
+  "sshKeyHint": "One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host"
 }

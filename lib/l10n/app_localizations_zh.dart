@@ -625,4 +625,71 @@ class AppLocalizationsZh extends AppLocalizations {
   String apiUnsupported(String version) {
     return '设备使用 API $version，请更新 App';
   }
+
+  @override
+  String get networkButton => '网络';
+
+  @override
+  String get settingsButton => '系统设置';
+
+  @override
+  String get applied => '已保存并应用';
+
+  @override
+  String applyFailed(String message) {
+    return '已保存，但应用失败：$message';
+  }
+
+  @override
+  String get applyPending => '已保存，设备仍在应用';
+
+  @override
+  String get maybeMoved => '设备不再响应：它可能换到了别的网络或地址，请回到列表重新查找。';
+
+  @override
+  String get wrongCurrent => '当前密码不正确';
+
+  @override
+  String removing(String ssid) {
+    return '正在删除 $ssid…';
+  }
+
+  @override
+  String get notConfigured => '未声明（DHCP）';
+
+  @override
+  String get noKnownNetworks => '没有保存的网络';
+
+  @override
+  String get remove => '删除';
+
+  @override
+  String get noWiredPorts => '设备没有有线网口';
+
+  @override
+  String get saving => '正在保存…';
+
+  @override
+  String get save => '保存';
+
+  @override
+  String get changePassword => '修改管理员密码';
+
+  @override
+  String get currentPassword => '当前密码';
+
+  @override
+  String get sshServer => 'SSH 服务';
+
+  @override
+  String get sshKeys => '授权公钥';
+
+  @override
+  String get noSshKeys => '没有授权公钥';
+
+  @override
+  String get addSshKey => '添加公钥';
+
+  @override
+  String get sshKeyHint => '一行 OpenSSH 公钥，如 ssh-ed25519 AAAA… user@host';
 }

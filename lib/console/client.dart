@@ -115,6 +115,11 @@ class ApiFailure implements Exception {
   String toString() => 'ApiFailure($status, $code)';
 }
 
+/// A queued apply had not finished when the app stopped waiting.
+class TaskPending implements Exception {
+  const TaskPending();
+}
+
 /// `GET /api/v1/session`'s `state`.
 enum SessionState { setup, unauthenticated, authenticated }
 
@@ -209,6 +214,83 @@ class ConsoleClient {
 
   Future<void> changePassword(String current, String next) =>
       _call('POST', '/api/v1/actions/change-password', {'currentPassword': current, 'newPassword': next});
+
+  /// A write the device persisted and queued: its task id.
+  Future<String> _task(String method, String path, Object? body) async {
+    final r = await _call(method, path, body);
+    return r is Map && r['taskId'] is String ? r['taskId'] as String : '';
+  }
+
+  Future<String> setHostname(String name) => _task('PUT', '/api/v1/settings/hostname', name);
+
+  Future<Object?> setting(String path) => _call('GET', '/api/v1/settings/$path');
+  Future<String> setSetting(String path, Object value) => _task('PUT', '/api/v1/settings/$path', value);
+
+  /// `{enabled, mode, locked}`: which role holds the radio.
+  Future<Json> wifiRole() => _object('/api/v1/wifi');
+
+  /// Switches the radio's role, keeping that role's stored configuration.
+  Future<String> setWifiRole({required bool enabled, required String mode}) =>
+      _task('PUT', '/api/v1/wifi', {'enabled': enabled, 'mode': mode});
+
+  Future<List<Json>> wifiNetworks() async {
+    final v = await _call('GET', '/api/v1/wifi/client/networks');
+    return [
+      for (final n in v is List ? v : const [])
+        if (n is Map) n.cast<String, Object?>(),
+    ];
+  }
+
+  Future<void> addWifiNetwork(String ssid, String psk, {bool hidden = false}) => _call(
+    'POST',
+    '/api/v1/wifi/client/networks',
+    {'ssid': ssid, if (psk.isNotEmpty) 'psk': psk, 'hidden': hidden, 'priority': 0},
+  );
+
+  Future<void> removeWifiNetwork(String ssid) =>
+      _call('DELETE', '/api/v1/wifi/client/networks/${Uri.encodeComponent(ssid)}');
+
+  /// `{available, networks?, reason?}`: what the station's radio found.
+  Future<Json> scanWifi() async {
+    final v = await _call('POST', '/api/v1/wifi/client/scan');
+    return v is Map ? v.cast<String, Object?>() : const {};
+  }
+
+  /// The declared `network` map, by interface name.
+  Future<Json> configuredNetwork() async {
+    final v = (await _object('/api/v1/network'))['configured'];
+    return v is Map ? v.cast<String, Object?>() : const {};
+  }
+
+  Future<String> setInterface(String name, Json entry) =>
+      _task('PUT', '/api/v1/network/${Uri.encodeComponent(name)}', entry);
+
+  Future<List<Json>> sshKeys() async {
+    final v = (await _object('/api/v1/ssh/authorized-keys'))['keys'];
+    return [
+      for (final k in v is List ? v : const [])
+        if (k is Map) k.cast<String, Object?>(),
+    ];
+  }
+
+  Future<void> addSshKey(String line) => _call('POST', '/api/v1/ssh/authorized-keys', {'key': line});
+
+  Future<void> removeSshKey(String fingerprint) =>
+      _call('DELETE', '/api/v1/ssh/authorized-keys/${Uri.encodeComponent(fingerprint)}');
+
+  /// Waits for a queued apply to finish: null when it succeeded, the device's
+  /// message when it failed. Gives up after [limit], answering [TaskPending].
+  Future<String?> settle(String id, {Duration every = const Duration(seconds: 1), int limit = 30}) async {
+    if (id.isEmpty) return null;
+    for (var i = 0; i < limit; i++) {
+      final r = await _object('/api/v1/tasks/${Uri.encodeComponent(id)}');
+      if (r['status'] == 'finished') {
+        return r['outcome'] == 'succeeded' ? null : '${r['message'] ?? r['outcome'] ?? ''}';
+      }
+      await Future<void>.delayed(every);
+    }
+    throw const TaskPending();
+  }
 
   /// Whether `/` serves a console: an API-only device answers 404.
   Future<bool> hasConsole() async {
