@@ -1,0 +1,66 @@
+name: release
+# A published release <YYYYMMDD-HHMM> (cut with `gh release create <tag>
+# --target <commit of main>`): the release APK built from the tag, signed
+# with the repository's release key, attached to the release with a
+# SHA256SUMS listing it. The version name is the tag; the version code is
+# the tag's minutes since the epoch, so every later release installs over
+# an earlier one.
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: The tag is a release version
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^[0-9]{8}-[0-9]{4}$ ]] || { echo "::error::tag $TAG is not YYYYMMDD-HHMM"; exit 1; }
+          code=$(( $(date -u -d "${TAG:0:8} ${TAG:9:2}:${TAG:11:2}" +%s) / 60 ))
+          echo "VERSION_CODE=$code" >>"$GITHUB_ENV"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter test
+      - name: The release key
+        env:
+          KEYSTORE: ${{ secrets.MICA_APP_KEYSTORE }}
+        run: |
+          set -euo pipefail
+          [ -n "$KEYSTORE" ] || { echo "::error::secret MICA_APP_KEYSTORE is not set"; exit 1; }
+          printf '%s' "$KEYSTORE" | base64 -d >"$RUNNER_TEMP/release.jks"
+          echo "MICA_APP_KEYSTORE=$RUNNER_TEMP/release.jks" >>"$GITHUB_ENV"
+      - name: Build
+        env:
+          MICA_APP_KEYSTORE_PASSWORD: ${{ secrets.MICA_APP_KEYSTORE_PASSWORD }}
+          MICA_APP_KEY_ALIAS: ${{ secrets.MICA_APP_KEY_ALIAS }}
+          MICA_APP_KEY_PASSWORD: ${{ secrets.MICA_APP_KEY_PASSWORD }}
+        run: flutter build apk --release --build-name="$TAG" --build-number="$VERSION_CODE"
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-release.apk "out/mica-app-$TAG.apk"
+          (cd out && sha256sum "mica-app-$TAG.apk" >SHA256SUMS)
+          gh release upload "$TAG" out/* --clobber

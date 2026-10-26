@@ -29,11 +29,24 @@ android {
         versionName = flutter.versionName
     }
 
+    // The release key comes from the environment release.yml sets up from the
+    // repository's secrets; without it a release build is signed with the
+    // debug key, for `flutter run --release` on a developer's phone.
+    val keystore = System.getenv("MICA_APP_KEYSTORE")
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("MICA_APP_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("MICA_APP_KEY_ALIAS")
+                keyPassword = System.getenv("MICA_APP_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystore != null) "release" else "debug")
         }
     }
 }

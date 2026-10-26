@@ -1,7 +1,7 @@
 name: ci
 # Every push to main and pull request: analyze and test on Flutter 3.47.7
 # (the SDK tools/flutter.Dockerfile pins), check that the test vectors are
-# still mica-core's, and build a debug APK on main. No store builds yet.
+# still mica-core's, and build a debug APK on main. Release APKs: release.yml.
 on:
   workflow_dispatch:
   push:
