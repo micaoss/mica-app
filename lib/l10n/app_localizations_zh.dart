@@ -463,7 +463,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resultWiredDhcpTimeout => '30 秒内没有获得 DHCP 地址。设置已保存';
 
   @override
-  String get appTitle => 'mica';
+  String get appTitle => 'Mica';
 
   @override
   String get homeLead => '设置和管理 mica 设备。';

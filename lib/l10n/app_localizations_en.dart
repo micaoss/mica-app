@@ -472,7 +472,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resultWiredDhcpTimeout => 'No DHCP address within 30 seconds. The settings are saved';
 
   @override
-  String get appTitle => 'mica';
+  String get appTitle => 'Mica';
 
   @override
   String get homeLead => 'Set up and manage mica devices.';

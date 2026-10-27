@@ -212,7 +212,7 @@
   "resultBridgePortTaken": "The port is in more than one bridge",
   "resultNoCarrier": "No cable is plugged in. The settings are saved and apply once one is",
   "resultWiredDhcpTimeout": "No DHCP address within 30 seconds. The settings are saved",
-  "appTitle": "mica",
+  "appTitle": "Mica",
   "homeLead": "Set up and manage mica devices.",
   "homeBle": "Bluetooth setup",
   "homeBleHint": "A device in its Bluetooth setup window: its Wi-Fi or wired network, without joining its hotspot.",

@@ -143,7 +143,7 @@
   "resultBridgePortTaken": "该网口属于多个网桥",
   "resultNoCarrier": "没有插网线。设置已保存，插上网线后生效",
   "resultWiredDhcpTimeout": "30 秒内没有获得 DHCP 地址。设置已保存",
-  "appTitle": "mica",
+  "appTitle": "Mica",
   "homeLead": "设置和管理 mica 设备。",
   "homeBle": "蓝牙配网",
   "homeBleHint": "设备处于蓝牙配网窗口时：配置它的 Wi-Fi 或有线网络，无需连接设备热点。",
