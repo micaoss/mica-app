@@ -23,7 +23,19 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   generate: true
+
+# `dart run flutter_launcher_icons` regenerates the launcher icons from
+# assets/icon, which are the website's Mica icon (mica:website/public/favicon.svg).
+flutter_launcher_icons:
+  android: true
+  image_path_android: assets/icon/icon-android.png
+  adaptive_icon_background: "#232E38"
+  adaptive_icon_foreground: assets/icon/foreground.png
+  ios: true
+  image_path_ios: assets/icon/icon.png
+  remove_alpha_ios: true
