@@ -706,4 +706,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sshKeyHint => 'One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host';
+
+  @override
+  String get updateTitle => 'A new version';
+
+  @override
+  String updateBody(String version) {
+    return 'Mica $version is out. Download the APK and install it over this one.';
+  }
+
+  @override
+  String get updateLater => 'Later';
+
+  @override
+  String get updateDownload => 'Download';
 }

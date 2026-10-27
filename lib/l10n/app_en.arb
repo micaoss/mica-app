@@ -332,5 +332,16 @@
   "sshKeys": "Authorized keys",
   "noSshKeys": "No authorized keys",
   "addSshKey": "Add a key",
-  "sshKeyHint": "One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host"
+  "sshKeyHint": "One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host",
+  "updateTitle": "A new version",
+  "updateBody": "Mica {version} is out. Download the APK and install it over this one.",
+  "@updateBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateLater": "Later",
+  "updateDownload": "Download"
 }

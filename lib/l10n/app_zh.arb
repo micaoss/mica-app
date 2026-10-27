@@ -215,5 +215,9 @@
   "sshKeys": "授权公钥",
   "noSshKeys": "没有授权公钥",
   "addSshKey": "添加公钥",
-  "sshKeyHint": "一行 OpenSSH 公钥，如 ssh-ed25519 AAAA… user@host"
+  "sshKeyHint": "一行 OpenSSH 公钥，如 ssh-ed25519 AAAA… user@host",
+  "updateTitle": "有新版本",
+  "updateBody": "Mica {version} 已发布，下载 APK 后直接覆盖安装。",
+  "updateLater": "稍后",
+  "updateDownload": "下载"
 }

@@ -692,4 +692,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sshKeyHint => '一行 OpenSSH 公钥，如 ssh-ed25519 AAAA… user@host';
+
+  @override
+  String get updateTitle => '有新版本';
+
+  @override
+  String updateBody(String version) {
+    return 'Mica $version 已发布，下载 APK 后直接覆盖安装。';
+  }
+
+  @override
+  String get updateLater => '稍后';
+
+  @override
+  String get updateDownload => '下载';
 }

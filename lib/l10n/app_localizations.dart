@@ -1387,6 +1387,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'One OpenSSH public key line, such as ssh-ed25519 AAAA… user@host'**
   String get sshKeyHint;
+
+  /// No description provided for @updateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A new version'**
+  String get updateTitle;
+
+  /// No description provided for @updateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Mica {version} is out. Download the APK and install it over this one.'**
+  String updateBody(String version);
+
+  /// No description provided for @updateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get updateLater;
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownload;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
